@@ -1,0 +1,830 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>Nikita Nemkin</author>
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>667</width>
+    <height>576</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Deluge</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout_6">
+    <property name="margin">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="QSplitter" name="splitter">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <widget class="QSplitter" name="splitter_2">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>1</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="childrenCollapsible">
+        <bool>false</bool>
+       </property>
+       <widget class="FilterView" name="tree_filters">
+        <property name="uniformRowHeights">
+         <bool>true</bool>
+        </property>
+        <property name="headerHidden">
+         <bool>true</bool>
+        </property>
+        <column>
+         <property name="text">
+          <string notr="true">1</string>
+         </property>
+        </column>
+       </widget>
+       <widget class="TorrentView" name="tree_torrents">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="selectionMode">
+         <enum>QAbstractItemView::ExtendedSelection</enum>
+        </property>
+        <property name="rootIsDecorated">
+         <bool>false</bool>
+        </property>
+        <property name="uniformRowHeights">
+         <bool>true</bool>
+        </property>
+        <property name="sortingEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="allColumnsShowFocus">
+         <bool>true</bool>
+        </property>
+        <column>
+         <property name="text">
+          <string notr="true">1</string>
+         </property>
+        </column>
+       </widget>
+      </widget>
+      <widget class="TorrentDetails" name="tabs_details">
+       <property name="currentIndex">
+        <number>-1</number>
+       </property>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>667</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu_file">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="action_add_torrent"/>
+    <addaction name="action_create_torrent"/>
+    <addaction name="separator"/>
+    <addaction name="action_quit_daemon"/>
+    <addaction name="separator"/>
+    <addaction name="action_quit"/>
+   </widget>
+   <widget class="QMenu" name="menu_edit">
+    <property name="title">
+     <string>&amp;Edit</string>
+    </property>
+    <addaction name="action_preferences"/>
+    <addaction name="action_connection_manager"/>
+   </widget>
+   <widget class="QMenu" name="menu_torrent">
+    <property name="title">
+     <string>&amp;Torrent</string>
+    </property>
+    <widget class="QMenu" name="menu_torrent_options">
+     <property name="title">
+      <string>Opt&amp;ions</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../data/resources.qrc">
+       <normaloff>:/icons/deluge/16x16/categories/preferences-desktop.png</normaloff>:/icons/deluge/16x16/categories/preferences-desktop.png</iconset>
+     </property>
+     <widget class="QMenu" name="menu_torrent_download_speed">
+      <property name="title">
+       <string>&amp;Download Speed Limit</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../data/resources.qrc">
+        <normaloff>:/pixmaps/downloading16.png</normaloff>:/pixmaps/downloading16.png</iconset>
+      </property>
+     </widget>
+     <widget class="QMenu" name="menu_torrent_upload_speed">
+      <property name="title">
+       <string>&amp;Upload Speed Limit</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../data/resources.qrc">
+        <normaloff>:/pixmaps/seeding16.png</normaloff>:/pixmaps/seeding16.png</iconset>
+      </property>
+     </widget>
+     <widget class="QMenu" name="menu_torrent_max_connections">
+      <property name="title">
+       <string>&amp;Connection Limit</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../data/resources.qrc">
+        <normaloff>:/icons/deluge/16x16/places/network-workgroup.png</normaloff>:/icons/deluge/16x16/places/network-workgroup.png</iconset>
+      </property>
+     </widget>
+     <widget class="QMenu" name="menu_torrent_upload_slots">
+      <property name="title">
+       <string>Upload &amp;Slot Limit</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../data/resources.qrc">
+        <normaloff>:/icons/deluge/16x16/actions/view-sort-ascending.png</normaloff>:/icons/deluge/16x16/actions/view-sort-ascending.png</iconset>
+      </property>
+     </widget>
+     <widget class="QMenu" name="menu_torrent_auto_managed">
+      <property name="title">
+       <string>&amp;Auto Managed</string>
+      </property>
+      <addaction name="action_torrent_automanage_on"/>
+      <addaction name="action_torrent_automanage_off"/>
+     </widget>
+     <addaction name="menu_torrent_download_speed"/>
+     <addaction name="menu_torrent_upload_speed"/>
+     <addaction name="menu_torrent_max_connections"/>
+     <addaction name="menu_torrent_upload_slots"/>
+     <addaction name="menu_torrent_auto_managed"/>
+    </widget>
+    <widget class="QMenu" name="menu_torrent_queue">
+     <property name="title">
+      <string>&amp;Queue</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../data/resources.qrc">
+       <normaloff>:/icons/deluge/16x16/actions/view-sort-ascending.png</normaloff>:/icons/deluge/16x16/actions/view-sort-ascending.png</iconset>
+     </property>
+     <addaction name="action_torrent_queue_top"/>
+     <addaction name="action_torrent_queue_up"/>
+     <addaction name="action_torrent_queue_down"/>
+     <addaction name="action_torrent_queue_bottom"/>
+    </widget>
+    <addaction name="action_torrent_open_folder"/>
+    <addaction name="separator"/>
+    <addaction name="action_torrent_pause"/>
+    <addaction name="action_torrent_resume"/>
+    <addaction name="separator"/>
+    <addaction name="menu_torrent_options"/>
+    <addaction name="separator"/>
+    <addaction name="menu_torrent_queue"/>
+    <addaction name="separator"/>
+    <addaction name="action_torrent_update_tracker"/>
+    <addaction name="action_torrent_edit_trackers"/>
+    <addaction name="separator"/>
+    <addaction name="action_torrent_remove"/>
+    <addaction name="separator"/>
+    <addaction name="action_torrent_move_storage"/>
+    <addaction name="action_torrent_force_recheck"/>
+   </widget>
+   <widget class="QMenu" name="menu_view">
+    <property name="title">
+     <string>&amp;View</string>
+    </property>
+    <widget class="QMenu" name="menu_sidebar">
+     <property name="title">
+      <string>S&amp;idebar</string>
+     </property>
+     <addaction name="action_sidebar_show_empty"/>
+     <addaction name="action_sidebar_show_trackers"/>
+    </widget>
+    <widget class="QMenu" name="menu_tabs">
+     <property name="title">
+      <string>T&amp;abs</string>
+     </property>
+    </widget>
+    <widget class="QMenu" name="menu_columns">
+     <property name="title">
+      <string>&amp;Columns</string>
+     </property>
+    </widget>
+    <addaction name="action_show_toolbar"/>
+    <addaction name="action_show_sidebar"/>
+    <addaction name="action_show_statusbar"/>
+    <addaction name="separator"/>
+    <addaction name="menu_tabs"/>
+    <addaction name="menu_columns"/>
+    <addaction name="menu_sidebar"/>
+   </widget>
+   <widget class="QMenu" name="menu_help">
+    <property name="title">
+     <string>&amp;Help</string>
+    </property>
+    <addaction name="action_help_homepage"/>
+    <addaction name="action_help_faq"/>
+    <addaction name="action_help_community"/>
+    <addaction name="separator"/>
+    <addaction name="action_about"/>
+   </widget>
+   <widget class="QMenu" name="popup_menu_tray">
+    <property name="title">
+     <string>Tray Menu</string>
+    </property>
+    <widget class="QMenu" name="menu_download_speed">
+     <property name="title">
+      <string>&amp;Download Speed Limit</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../data/resources.qrc">
+       <normaloff>:/pixmaps/downloading16.png</normaloff>:/pixmaps/downloading16.png</iconset>
+     </property>
+    </widget>
+    <widget class="QMenu" name="menu_upload_speed">
+     <property name="title">
+      <string>&amp;Upload Speed Limit</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../data/resources.qrc">
+       <normaloff>:/pixmaps/seeding16.png</normaloff>:/pixmaps/seeding16.png</iconset>
+     </property>
+    </widget>
+    <widget class="QMenu" name="menu_max_connections">
+     <property name="title">
+      <string>&amp;Max Connections</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../data/resources.qrc">
+       <normaloff>:/icons/deluge/16x16/places/network-workgroup.png</normaloff>:/icons/deluge/16x16/places/network-workgroup.png</iconset>
+     </property>
+    </widget>
+    <addaction name="action_show"/>
+    <addaction name="separator"/>
+    <addaction name="action_add_torrent"/>
+    <addaction name="separator"/>
+    <addaction name="action_torrent_resume_all"/>
+    <addaction name="action_torrent_pause_all"/>
+    <addaction name="separator"/>
+    <addaction name="menu_download_speed"/>
+    <addaction name="menu_upload_speed"/>
+    <addaction name="menu_max_connections"/>
+    <addaction name="separator"/>
+    <addaction name="action_quit_daemon"/>
+    <addaction name="separator"/>
+    <addaction name="action_quit"/>
+   </widget>
+   <widget class="QMenu" name="popup_menu_files">
+    <property name="title">
+     <string>File Menu</string>
+    </property>
+    <addaction name="action_file_expand_all"/>
+    <addaction name="separator"/>
+    <addaction name="action_file_do_not_download"/>
+    <addaction name="action_file_priority_normal"/>
+    <addaction name="action_file_priority_high"/>
+    <addaction name="action_file_priority_highest"/>
+   </widget>
+   <widget class="QMenu" name="popup_menu_filters">
+    <property name="title">
+     <string>Filter Menu</string>
+    </property>
+    <addaction name="action_filter_select_all"/>
+    <addaction name="action_filter_pause_all"/>
+    <addaction name="action_filter_resume_all"/>
+   </widget>
+   <widget class="QMenu" name="popup_menu_peers">
+    <property name="title">
+     <string>Peer Menu</string>
+    </property>
+    <addaction name="action_torrent_add_peer"/>
+   </widget>
+   <addaction name="menu_file"/>
+   <addaction name="menu_edit"/>
+   <addaction name="menu_torrent"/>
+   <addaction name="menu_view"/>
+   <addaction name="menu_help"/>
+   <addaction name="popup_menu_tray"/>
+   <addaction name="popup_menu_files"/>
+   <addaction name="popup_menu_filters"/>
+   <addaction name="popup_menu_peers"/>
+  </widget>
+  <widget class="QToolBar" name="toolbar">
+   <property name="windowTitle">
+    <string>Toolbar</string>
+   </property>
+   <property name="movable">
+    <bool>false</bool>
+   </property>
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonTextUnderIcon</enum>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="action_add_torrent"/>
+   <addaction name="action_torrent_remove"/>
+   <addaction name="separator"/>
+   <addaction name="action_torrent_pause"/>
+   <addaction name="action_torrent_resume"/>
+   <addaction name="separator"/>
+   <addaction name="action_torrent_queue_up"/>
+   <addaction name="action_torrent_queue_down"/>
+   <addaction name="separator"/>
+   <addaction name="action_preferences"/>
+   <addaction name="action_connection_manager"/>
+  </widget>
+  <widget class="StatusBar" name="statusbar"/>
+  <action name="action_add_torrent">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/24x24/actions/list-add.png</normaloff>:/icons/deluge/24x24/actions/list-add.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Add Torrent</string>
+   </property>
+  </action>
+  <action name="action_torrent_remove">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/24x24/actions/list-remove.png</normaloff>:/icons/deluge/24x24/actions/list-remove.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Remove Torrent</string>
+   </property>
+  </action>
+  <action name="action_torrent_pause">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/24x24/actions/media-playback-pause.png</normaloff>:/icons/deluge/24x24/actions/media-playback-pause.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Pause</string>
+   </property>
+  </action>
+  <action name="action_torrent_resume">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/24x24/actions/media-playback-start.png</normaloff>:/icons/deluge/24x24/actions/media-playback-start.png</iconset>
+   </property>
+   <property name="text">
+    <string>Resu&amp;me</string>
+   </property>
+  </action>
+  <action name="action_torrent_queue_up">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/24x24/actions/go-up.png</normaloff>:/icons/deluge/24x24/actions/go-up.png</iconset>
+   </property>
+   <property name="text">
+    <string>Up</string>
+   </property>
+  </action>
+  <action name="action_torrent_queue_down">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/24x24/actions/go-down.png</normaloff>:/icons/deluge/24x24/actions/go-down.png</iconset>
+   </property>
+   <property name="text">
+    <string>Down</string>
+   </property>
+  </action>
+  <action name="action_preferences">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/24x24/categories/preferences-desktop.png</normaloff>:/icons/deluge/24x24/categories/preferences-desktop.png</iconset>
+   </property>
+   <property name="text">
+    <string>Preferences</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::PreferencesRole</enum>
+   </property>
+  </action>
+  <action name="action_connection_manager">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/24x24/places/network-workgroup.png</normaloff>:/icons/deluge/24x24/places/network-workgroup.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Connection Manager</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="action_create_torrent">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/mimetypes/text-x-generic.png</normaloff>:/icons/deluge/16x16/mimetypes/text-x-generic.png</iconset>
+   </property>
+   <property name="text">
+    <string>Create Torrent</string>
+   </property>
+  </action>
+  <action name="action_quit">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/application-exit.png</normaloff>:/icons/deluge/16x16/actions/application-exit.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Quit</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::QuitRole</enum>
+   </property>
+  </action>
+  <action name="action_quit_daemon">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/application-exit.png</normaloff>:/icons/deluge/16x16/actions/application-exit.png</iconset>
+   </property>
+   <property name="text">
+    <string>Quit &amp;&amp; Shutdown Daemon</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::QuitRole</enum>
+   </property>
+  </action>
+  <action name="action_about">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/help-about.png</normaloff>:/icons/deluge/16x16/actions/help-about.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;About</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::AboutRole</enum>
+   </property>
+  </action>
+  <action name="action_help_faq">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/status/dialog-question.png</normaloff>:/icons/deluge/16x16/status/dialog-question.png</iconset>
+   </property>
+   <property name="text">
+    <string>FAQ</string>
+   </property>
+  </action>
+  <action name="action_help_community">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/status/dialog-information.png</normaloff>:/icons/deluge/16x16/status/dialog-information.png</iconset>
+   </property>
+   <property name="text">
+    <string>Community</string>
+   </property>
+  </action>
+  <action name="action_help_homepage">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/go-home.png</normaloff>:/icons/deluge/16x16/actions/go-home.png</iconset>
+   </property>
+   <property name="text">
+    <string>Homepage</string>
+   </property>
+  </action>
+  <action name="action_torrent_edit_trackers">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/document-edit.png</normaloff>:/icons/deluge/16x16/actions/document-edit.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Edit Trackers</string>
+   </property>
+  </action>
+  <action name="action_torrent_update_tracker">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/view-refresh.png</normaloff>:/icons/deluge/16x16/actions/view-refresh.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Update Tracker</string>
+   </property>
+  </action>
+  <action name="action_torrent_move_storage">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/document-save-as.png</normaloff>:/icons/deluge/16x16/actions/document-save-as.png</iconset>
+   </property>
+   <property name="text">
+    <string>Move &amp;Storage</string>
+   </property>
+  </action>
+  <action name="action_torrent_force_recheck">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/edit-redo.png</normaloff>:/icons/deluge/16x16/actions/edit-redo.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Force Re-check</string>
+   </property>
+  </action>
+  <action name="action_torrent_open_folder">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/places/folder.png</normaloff>:/icons/deluge/16x16/places/folder.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Open Folder</string>
+   </property>
+  </action>
+  <action name="action_torrent_queue_top">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/go-top.png</normaloff>:/icons/deluge/16x16/actions/go-top.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Top</string>
+   </property>
+  </action>
+  <action name="action_torrent_queue_bottom">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/go-bottom.png</normaloff>:/icons/deluge/16x16/actions/go-bottom.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Bottom</string>
+   </property>
+  </action>
+  <action name="action_torrent_resume_all">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/media-seek-forward.png</normaloff>:/icons/deluge/16x16/actions/media-seek-forward.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Resume All</string>
+   </property>
+  </action>
+  <action name="action_torrent_pause_all">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/media-playback-pause.png</normaloff>:/icons/deluge/16x16/actions/media-playback-pause.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Pause All</string>
+   </property>
+  </action>
+  <action name="action_show">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Show Deluge</string>
+   </property>
+  </action>
+  <action name="action_filter_pause_all">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/media-playback-pause.png</normaloff>:/icons/deluge/16x16/actions/media-playback-pause.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Pause All</string>
+   </property>
+  </action>
+  <action name="action_filter_resume_all">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/media-seek-forward.png</normaloff>:/icons/deluge/16x16/actions/media-seek-forward.png</iconset>
+   </property>
+   <property name="text">
+    <string>Resu&amp;me All</string>
+   </property>
+  </action>
+  <action name="action_filter_select_all">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/edit-select-all.png</normaloff>:/icons/deluge/16x16/actions/edit-select-all.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Select All</string>
+   </property>
+  </action>
+  <action name="action_file_expand_all">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/zoom-fit-best.png</normaloff>:/icons/deluge/16x16/actions/zoom-fit-best.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Expand All</string>
+   </property>
+  </action>
+  <action name="action_file_do_not_download">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/pixmaps/gtk-no.png</normaloff>:/pixmaps/gtk-no.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Do Not Download</string>
+   </property>
+  </action>
+  <action name="action_file_priority_normal">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/pixmaps/gtk-yes.png</normaloff>:/pixmaps/gtk-yes.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Normal Priority</string>
+   </property>
+  </action>
+  <action name="action_file_priority_high">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/go-up.png</normaloff>:/icons/deluge/16x16/actions/go-up.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;High Priority</string>
+   </property>
+  </action>
+  <action name="action_file_priority_highest">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/go-top.png</normaloff>:/icons/deluge/16x16/actions/go-top.png</iconset>
+   </property>
+   <property name="text">
+    <string>Hi&amp;ghest Priority</string>
+   </property>
+  </action>
+  <action name="action_show_toolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Toolbar</string>
+   </property>
+  </action>
+  <action name="action_show_sidebar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Sidebar</string>
+   </property>
+  </action>
+  <action name="action_show_statusbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Status&amp;bar</string>
+   </property>
+  </action>
+  <action name="action_sidebar_show_empty">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show &amp;Zero Hits</string>
+   </property>
+  </action>
+  <action name="action_sidebar_show_trackers">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show &amp;Trackers</string>
+   </property>
+  </action>
+  <action name="action_torrent_add_peer">
+   <property name="icon">
+    <iconset resource="../data/resources.qrc">
+     <normaloff>:/icons/deluge/16x16/actions/list-add.png</normaloff>:/icons/deluge/16x16/actions/list-add.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Add Peer</string>
+   </property>
+  </action>
+  <action name="action_torrent_automanage_on">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>On</string>
+   </property>
+  </action>
+  <action name="action_torrent_automanage_off">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Off</string>
+   </property>
+  </action>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>TorrentDetails</class>
+   <extends>QTabWidget</extends>
+   <header location="global">deluge_qt.torrent_details</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>TorrentView</class>
+   <extends>QTreeWidget</extends>
+   <header location="global">deluge_qt.torrent_view</header>
+  </customwidget>
+  <customwidget>
+   <class>FilterView</class>
+   <extends>QTreeWidget</extends>
+   <header location="global">deluge_qt.filter_view</header>
+  </customwidget>
+  <customwidget>
+   <class>StatusBar</class>
+   <extends>QStatusBar</extends>
+   <header location="global">deluge_qt.status_bar</header>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="../data/resources.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>action_show_toolbar</sender>
+   <signal>triggered(bool)</signal>
+   <receiver>toolbar</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>333</x>
+     <y>46</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_show_statusbar</sender>
+   <signal>triggered(bool)</signal>
+   <receiver>statusbar</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>333</x>
+     <y>565</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_show_sidebar</sender>
+   <signal>triggered(bool)</signal>
+   <receiver>tree_filters</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>127</x>
+     <y>308</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_quit</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>333</x>
+     <y>287</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>on_action_url_triggered()</slot>
+ </slots>
+</ui>

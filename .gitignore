@@ -1,0 +1,9 @@
+*.pyc
+build
+dist
+*.egg-info
+*.egg
+*.log
+*.tar.*
+deluge_qt/generated
+deluge_qt/data/resources.qrc

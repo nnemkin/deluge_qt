@@ -1,0 +1,48 @@
+
+UI Design Workflow
+------------------
+
+Most of the UI is build with Qt Designer (*.ui files in qtui/ui).
+Python code is generated (using PyQt's pyuic) from ui files and put into single file qtui/generated/ui.py.
+The generated code won't work as is and needs postprocessing which is done in pyuic_postprocess.py script.
+
+Qt resources file (qtui/data/resources.qrc) exists only for design time work. It's generated automatically
+with tools/regen_dev.py script and contains references to all image files in data/ folder of packages deluge and qtui.
+
+Basically, run regen_dev.py before editing ui files and also after data/ dir contents change;
+run regen_ui.py after editing ui files to update classes used in code.
+
+Code is written against PyQt 4.5. Only QtCore and QtGui are allowed for now.
+Backward compatibility (with PyQt 4.4) will be hacked in using monkey patching, postprocessing and other unsightly techniques.
+
+How to integrate KDE is not decided yet. Options include: conditional defines, polymorphic classes and postprocessing.
+
+
+Code Style Bits
+---------------
+
+* Top-level module components (imports section, classes, constants and functions) are separated by 2 empty lines.
+* Imports are split in groups: stdlib modules, infrastructure modules (PyQt, twisted), deluge core modules, qtui
+  modules. Groups are separeted with an empty line.
+* Class member order is:
+   - Qt signal declarations,
+   - inner classes, classmethods and staticmethods,
+   - class variable declarations and class block code,
+   - constructor, python methods,
+   - deluge Comonent methods (start, stop, shutdown, update),
+   - Qt member overrides,
+   - Slots (signal handlers).
+
+* PEP-8 is in effect with two exceptions. First, recommended maximum line width is 120 characters.
+  Second, methods/variables that are tightly coupled with Qt or defined by Qt follow Qt naming practices.
+* Private and protedted variables
+* Use inlineCallbacks.
+* Use super().
+* Use @QtCore.pyqtSlot with python type args to declare signal handlers.
+* Use new-style signal connections.
+
+
+Windows Packaging
+-----------------
+
+Words about py2exe, egg tricks and building minimal PyQt.
