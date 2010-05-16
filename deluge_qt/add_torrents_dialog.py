@@ -160,13 +160,17 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
 
     @QtCore.pyqtSlot()
     def on_button_url_clicked(self):
-        url = QtGui.QApplication.clipboard().text()
-        if not deluge.common.is_url(url):
-            url = ""
+        dialog = QtGui.QDialog(self, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
         try:
-            dialog = AddUrlDialog(self)
+            dialog_ui = Ui_AddUrlDialog()
+            dialog_ui.setupUi(dialog)
+
+            url = QtGui.QApplication.clipboard().text()
+            if deluge.common.is_url(url):
+                dialog_ui.text_url.setText(url)
+
             if dialog.exec_():
-                url = dialog.url().strip()
+                url = dialog_ui.text_url.text().strip()
                 if deluge.common.is_url(url):
                     self.add_url(url)
                 elif deluge.common.is_magnet(url):
@@ -178,12 +182,16 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
 
     @QtCore.pyqtSlot()
     def on_button_hash_clicked(self):
-        dialog = AddHashDialog(self)
+        dialog = QtGui.QDialog(self, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
         try:
+            dialog_ui = Ui_AddHashDialog()
+            dialog_ui.setupUi(dialog)
             if dialog.exec_():
-                trackers = [tracker for tracker in dialog.trackers().split("\n") if deluge.common.is_url(tracker)]
-                magnet = deluge.common.create_magnet_uri(infohash=dialog.infohash(), trackers=trackers)
-                self.add_from_magnets([magnet])
+                infohash = dialog_ui.text_infohash.text().strip()
+                trackers = dialog_ui.text_trackers.toPlainText().strip()
+                trackers = [tracker for tracker in trackers.split("\n") if deluge.common.is_url(tracker)]
+                magnet_url = deluge.common.create_magnet_uri(infohash, trackers=trackers)
+                self.add_url(magnet_url)
         finally:
             dialog.deleteLater()
 
@@ -313,30 +321,3 @@ class TorrentFileRoot(FileItemRoot):
             for child in item.children():
                 self._mapped_files(new_path, child, mapping)
         return mapping
-
-
-class AddHashDialog(QtGui.QDialog, Ui_AddHashDialog):
-
-    def __init__(self, parent):
-        super(AddHashDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
-        self.setupUi(self)
-
-    def infohash(self):
-        return self.text_infohash.text()
-
-    def trackers(self):
-        return self.text_trackers.text()
-
-
-class AddUrlDialog(QtGui.QDialog, Ui_AddUrlDialog):
-
-    def __init__(self, parent, url=""):
-        super(AddUrlDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
-
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self.setupUi(self)
-
-        self.text_url.setText(url)
-
-    def url(self):
-        return self.text_url.text()
