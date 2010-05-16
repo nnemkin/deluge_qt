@@ -37,7 +37,7 @@ from deluge.ui.client import client
 from deluge import component, configmanager
 
 from .ui_tools import ProgressBarDelegate, HeightFixItemDelegate, IconLoader, treeContextMenuHandler
-from .ui_common import TreeColumns, FileItem, FileItemRoot
+from .ui_common import FileItem, FileItemRoot
 
 
 class TorrentFileItem(FileItem):
@@ -50,11 +50,8 @@ class TorrentFileItem(FileItem):
                        2: IconLoader.themeIcon("go-up"),
                        5: IconLoader.themeIcon("go-top")}
 
-    columns = TreeColumns()
-    columns.add("Filename", width=45, const=True)
-    columns.add("Size", width=10, const=True)
-    columns.add("Progress", width=10)
-    columns.add("Priority", width=10)
+    column_names = ["Filename", "Size", "Progress", "Priority"]
+    column_widths = [45, 10, 10, 10]
 
     def __init__(self, parent, name, file=None):
         super(TorrentFileItem, self).__init__(parent, name, file)
@@ -103,7 +100,7 @@ class FileView(QtGui.QTreeWidget, component.Component):
         self.files_cache = {}
 
         HeightFixItemDelegate.install(self)
-        self.setHeaderLabels(TorrentFileItem.columns.names)
+        self.setHeaderLabels(TorrentFileItem.column_names)
         self.setItemDelegateForColumn(2, ProgressBarDelegate(self))
 
         self.header().sortIndicatorChanged.connect(self.on_header_sortIndicatorChanged)
@@ -116,7 +113,7 @@ class FileView(QtGui.QTreeWidget, component.Component):
             self.header().restoreState(QtCore.QByteArray.fromBase64(self.ui_config['file_view_state']))
         except KeyError:
             em = self.header().fontMetrics().width('M')
-            for i, width in enumerate(TorrentFileItem.columns.widths):
+            for i, width in enumerate(TorrentFileItem.column_widths):
                 self.header().resizeSection(i, width * em)
 
     def start(self):

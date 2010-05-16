@@ -30,9 +30,7 @@
 #
 
 import operator
-from collections import defaultdict
 
-import sip
 from PyQt4 import QtCore, QtGui
 from twisted.internet import defer
 
@@ -43,96 +41,150 @@ from deluge.log import LOG as log
 from .ui_tools import IconLoader
 
 
-class TreeColumns(object):
-    """QTreeView columns metadata collector."""
+class ColumnModel(QtCore.QAbstractTableModel):
 
-    def __init__(self):
-        self.names = []
-        self.widths = []
-        self.sorters = []
-        self.updaters = []
-        self.updaters_by_field = defaultdict(list)
+    # NOTE: QModelIndex.internalPointer() does not count as a python reference, so care must be taken
+    # to keep referenced objects (item IDs) alive.
 
-    def _add_sorter(self, arg):
-        if isinstance(arg, tuple):
-            formatter, fields = arg[0], arg[1:]
-            sorter = lambda status: formatter(*(status[field] for field in fields))
-        else:
-            sorter = operator.itemgetter(arg)
-        self.sorters.append(sorter)
+    INVALID_INDEX = QtCore.QModelIndex()
 
-    def _add_updater(self, column, role, const, arg):
-        if isinstance(arg, tuple):
-            formatter, fields = arg[0], arg[1:]
-            def updater(item, status):
-                value = formatter(*(status[field] for field in fields))
-                if isinstance(value, defer.Deferred):
-                    def set_data_cb(value):
-                        if not sip.isdeleted(item):
-                            item.setData(column, role, value)
-                    value.addCallback(set_data_cb)
-                else:
-                    item.setData(column, role, value)
-        else:
-            fields = (arg,)
-            def updater(item, status):
-                item.setData(column, role, status[arg])
-        updater.column = column
-        updater.fields = fields
+    class Column(object):
 
-        self.updaters.append(updater)
-        if not const:
-            for field in fields:
-                self.updaters_by_field[field].append(updater)
+        def __init__(self, name, width=None, **kwargs):
+            self.name = name
+            self.width = width
+            self.fields = set()
+            self.formatters = {}
+            for key, arg in kwargs.items():
+                self._add_formatter(key, arg)
+            self.sorter = self.formatters[QtCore.Qt.UserRole + 1]
 
-    def add(self, name, sort=None, width=10, const=False, **kwargs):
-        column = len(self.names)
-        for role, args in kwargs.items():
-            role = {"text": QtCore.Qt.DisplayRole, "icon": QtCore.Qt.DecorationRole,
-                    "user": QtCore.Qt.UserRole, "toolTip": QtCore.Qt.ToolTipRole}[role]
-            self._add_updater(column, role, const, args)
+        def _add_formatter(self, key, arg):
+            role = {"text": QtCore.Qt.DisplayRole,
+                    "icon": QtCore.Qt.DecorationRole,
+                    "toolTip": QtCore.Qt.ToolTipRole,
+                    "user": QtCore.Qt.UserRole,
+                    "sort": QtCore.Qt.UserRole + 1}[key]
+            if isinstance(arg, tuple):
+                func, fields = arg[0], arg[1:]
+                self.formatters[role] = lambda status: func(*(status[field] for field in fields))
+                self.fields.update(fields)
+            else:
+                self.formatters[role] = operator.itemgetter(arg)
+                self.fields.add(arg)
 
-        if sort:
-            self._add_sorter(sort)
-        self.names.append(name)
-        self.widths.append(width)
+    def __init__(self, parent):
+        super(ColumnModel, self).__init__(parent)
 
+        self.items = {} # dict id -> data
+        self.visual_order = [] # list of ids
+        self.columns = self._create_columns() # subclass method
+        self.sort_column = self.columns[0]
+        self.sort_reverse = False
 
-class TreeItem(QtGui.QTreeWidgetItem):
-    """TreeItem that uses TreeColumns metadata to initialize and update itself."""
+    def _create_columns(self):
+        raise NotImplementedError
 
-    @classmethod
-    def fields(cls, columns=None):
+    def ids_from_indices(self, indices):
+        return [index.internalPointer() for index in indices]
+
+    def index_from_id(self):
+        pass
+
+    def fields(self, isColumnHidden=None):
         fields = set()
-        for updater in cls.columns.updaters:
-            if not columns or columns[updater.column]:
-                fields.update(updater.fields)
+        for i, column in enumerate(self.columns):
+            if not isColumnHidden or not isColumnHidden(i):
+                fields.update(column.fields)
+        fields.update(self.sort_column.fields)
         return list(fields)
 
-    def __init__(self, status, sort_column):
-        super(TreeItem, self).__init__()
+    def clear(self):
+        self.layoutAboutToBeChanged.emit()
+        self.items = {}
+        self.visual_order = []
+        self.layoutChanged.emit()
 
-        self.status = status
-        for updater in self.columns.updaters:
-            updater(self, status)
-        self.sort_column = None
+    def rowCount(self, parent):
+        return len(self.visual_order)
 
-    def update(self, new_status):
-        if self.status != new_status:
-            for field in new_status:
-                if new_status[field] != self.status.get(field):
-                    for updater in self.columns.updaters_by_field[field]:
-                        updater(self, new_status)
-            self.status = new_status
-        self.sort_column = None
+    def columnCount(self, parent):
+        return len(self.columns)
 
-    def sort_key(self):
-        if self.sort_column is None:
-            self.sort_column = self.treeWidget().sortColumn() # NB: self.treeWidget() is abysmally slow
-        return self.columns.sorters[self.sort_column](self.status)
+    def headerData(self, section, orientation, role):
+        if role == QtCore.Qt.DisplayRole:
+            return _(self.columns[section].name)
 
-    def __lt__(self, other):
-        return self.sort_key() < other.sort_key()
+    def data(self, index, role):
+        try:
+            formatter = self.columns[index.column()].formatters[role]
+            item = self.items[index.internalPointer()]
+        except (IndexError, KeyError):
+            pass
+        else:
+            return formatter(item)
+
+    def index(self, row, column, parent=INVALID_INDEX):
+        try:
+            id = self.visual_order[row]
+        except IndexError:
+            return self.INVALID_INDEX
+        else:
+            return super(ColumnModel, self).createIndex(row, column, id)
+
+    def _emit_changes(self, mask, stat_row, end_row):
+        self.dataChanged.emit()
+
+    def update(self, new_items):
+        if self.items == new_items:
+            return
+
+        sort_args = {"key": lambda id: self.sort_column.sorter(new_items[id]), "reverse": self.sort_reverse}
+        if len(self.items) == len(new_items):
+            try:
+                self.visual_order.sort(**sort_args)
+            except KeyError:
+                pass # new items are present
+            else:
+                # items are the same (and sorted properly), send dataChanged
+                changed_fields = set()
+                for id, data in self.items:
+                    new_data = new_items[id]
+                    changed_fields.update(field for field in new_data if new_data[field] != data.get(field))
+                changed_columns = [i for i, column in enumerate(self.columns) if column.fields.issubset(changed_fields)]
+
+                self.items = new_items
+                self.dataChanged.emit(self.index(0, min(changed_columns)),
+                                      self.index(len(self.items), max(changed_columns)))
+                return
+
+        # items are different, sort anew and send layoutChanged
+        self.layoutAboutToBeChanged.emit()
+        self.visual_order = sorted(new_items.iterkeys(), **sort_args)
+        self._update_persistent_indices()
+        self.items = new_items
+        self.layoutChanged.emit()
+
+    def sort(self, column, order):
+        self.sort_column = self.columns[column]
+        self.sort_reverse = (order == QtCore.Qt.DescendingOrder)
+        self.layoutAboutToBeChanged.emit()
+        self.visual_order.sort(key=lambda id: self.sort_column.sorter(self.items[id]), reverse=self.sort_reverse)
+        self._update_persistent_indices()
+        self.layoutChanged.emit()
+
+    def _update_persistent_indices(self):
+        indices = self.persistentIndexList()
+        row_map = dict((id, row) for row, id in enumerate(self.visual_order))
+        new_indices = []
+        for index in indices:
+            id = index.internalPointer()
+            try:
+                new_index = self.createIndex(row_map[id], index.column(), id)
+            except KeyError:
+                new_index = self.INVALID_INDEX
+            new_indices.append(new_index)
+        self.changePersistentIndexList(indices, new_indices)
 
 
 class FileItem(QtGui.QTreeWidgetItem):
@@ -297,7 +349,7 @@ class _TrackerIconsCache(object):
     EMPTY_ICON = QtGui.QIcon()
 
     def __init__(self):
-        self._icons = {}
+        self._icons = {"": None}
 
     @defer.inlineCallbacks
     def __call__(self, host):

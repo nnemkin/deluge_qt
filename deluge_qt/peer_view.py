@@ -41,51 +41,38 @@ from deluge.ui.countries import COUNTRIES
 
 import deluge.common
 from .ui_tools import ProgressBarDelegate, HeightFixItemDelegate, IconLoader
-from .ui_common import TreeItem, TreeColumns
+from .ui_common import ColumnModel
 from .lang_tools import memoize
 
 
-@memoize
-def _flag_icon(country):
-    try:
-        return IconLoader.packageIcon("data/pixmaps/flags/%s.png" % country.lower())
-    except Exception:
-        log.debug("Unable to load flag: %s", exc_info=True)
+class PeerViewModel(ColumnModel):
+
+    def _create_columns(self):
+        peer_seed_icon = (IconLoader.customIcon("downloading16.png"), IconLoader.customIcon("seeding16.png"))
+
+        @memoize
+        def flag_icon(country):
+            try:
+                if country:
+                    return IconLoader.packageIcon("data/pixmaps/flags/%s.png" % country.lower())
+            except Exception:
+                log.debug("Unable to load flag: %s", exc_info=True)
+
+        def ip_sort_key(ip):
+            addr, port = ip.rsplit(':', 1)
+            addr = inet_pton(socket.AF_INET6 if ':' in addr else socket.AF_INET, addr)
+            return (addr, port)
+
+        return [self.Column("", icon=(flag_icon, "country"), toolTip=(COUNTRIES.get, "country"), sort="country", width=3),
+                self.Column("Address", text="ip", icon=(lambda flag: peer_seed_icon[bool(flag)], "seed"),
+                            sort=(ip_sort_key, "total_wanted"), width=20),
+                self.Column("Client", text="client", sort="client", width=15),
+                self.Column("Progress", text=(deluge.common.fpcnt, "progress"), user="progress", sort="progress", width=15),
+                self.Column("Down Speed", text=(deluge.common.fspeed, "down_speed"), sort="down_speed", width=10),
+                self.Column("Up Speed", text=(deluge.common.fspeed, "up_speed"), sort="up_speed", width=10)]
 
 
-class PeerSeedIconsCache(object):
-
-    _icon_peer = IconLoader.customIcon("downloading16.png")
-    _icon_seed = IconLoader.customIcon("seeding16.png")
-
-    def __call__(self, seed):
-        return self._icon_seed if seed else self._icon_peer
-
-
-def _ip_sort_key(ip):
-    addr, port = ip.rsplit(':', 1)
-    addr = inet_pton(socket.AF_INET6 if ':' in addr else socket.AF_INET, addr)
-    return (addr, port)
-
-
-class PeerItem(TreeItem):
-
-    columns = TreeColumns()
-    columns.add("", icon=(_flag_icon, "country"), toolTip=(COUNTRIES.get, "country"), sort="country",
-                const=True, width=3)
-    columns.add(_("Address"), text="ip", icon=(PeerSeedIconsCache(), "seed"), sort=(_ip_sort_key, "total_wanted"),
-                const=True, width=20)
-    columns.add(_("Client"), text="client", sort="client", const=True, width=15)
-    columns.add(_("Progress"), text=(deluge.common.fpcnt, "progress"), user="progress", sort="progress", width=15)
-    columns.add(_("Down Speed"), text=(deluge.common.fspeed, "down_speed"), sort="down_speed", width=10)
-    columns.add(_("Up Speed"), text=(deluge.common.fspeed, "up_speed"), sort="up_speed", width=10)
-
-    @classmethod
-    def is_const_column(cls, index):
-        return index < 3
-
-
-class PeerView(QtGui.QTreeWidget, component.Component):
+class PeerView(QtGui.QTreeView, component.Component):
 
     def __init__(self, parent=None):
         QtGui.QTreeWidget.__init__(self, parent)
@@ -94,24 +81,21 @@ class PeerView(QtGui.QTreeWidget, component.Component):
         self.ui_config = configmanager.ConfigManager('qtui.conf')
 
         self.torrent_ids = []
-        self.items = {}
+
+        self.setModel(PeerViewModel(self))
 
         HeightFixItemDelegate.install(self)
         self.setItemDelegateForColumn(3, ProgressBarDelegate(self))
-        self.setHeaderLabels(PeerItem.columns.names)
 
         try:
             self.header().restoreState(QtCore.QByteArray.fromBase64(self.ui_config['peer_view_state']))
         except KeyError:
             em = self.header().fontMetrics().width('M')
-            for i, width in enumerate(PeerItem.columns.widths):
-                self.header().resizeSection(i, width * em)
-
-    def start(self):
-        pass
+            for i, column in enumerate(self.model().columns):
+                self.header().resizeSection(i, column.width * em)
 
     def stop(self):
-        self._clear()
+        self.model().clear()
 
     def shutdown(self):
         self.ui_config['peer_view_state'] = self.header().saveState().toBase64().data()
@@ -119,36 +103,9 @@ class PeerView(QtGui.QTreeWidget, component.Component):
     @defer.inlineCallbacks
     def update(self):
         if self.torrent_ids:
-            sort_column = self.sortColumn()
-            peers = (yield component.get("SessionProxy").get_torrent_status(self.torrent_ids[0], ["peers"]))["peers"]
-
-            new_items = []
-            for peer in peers:
-                try:
-                    item = self.items[peer["ip"]]
-                except KeyError:
-                    item = PeerItem(peer, sort_column)
-                    self.items[peer["ip"]] = item
-                    new_items.append(item)
-                else:
-                    item.update(peer)
-
-            deleted_ips = set(self.items)
-            deleted_ips.difference_update(peer["ip"] for peer in peers)
-
-            disable_sort = (deleted_ips or new_items) and not PeerItem.is_const_column(sort_column)
-            if disable_sort:
-                self.setSortingEnabled(False)
-
-            for ip in deleted_ips:
-                self.takeTopLevelItem(self.indexOfTopLevelItem(self.items[ip]))
-                del self.items[ip]
-
-            if new_items:
-                self.addTopLevelItems(new_items)
-
-            if disable_sort:
-                self.setSortingEnabled(True)
+            status = (yield component.get("SessionProxy").get_torrent_status(self.torrent_ids[0], ["peers"]))
+            peers = dict((peer["ip"], peer) for peer in status["peers"])
+            self.model().update(peers)
 
     @QtCore.pyqtSlot(object)
     def set_torrent_ids(self, torrent_ids):
@@ -157,8 +114,4 @@ class PeerView(QtGui.QTreeWidget, component.Component):
             if torrent_ids:
                 self.update()
             else:
-                self._clear()
-
-    def _clear(self):
-        self.clear()
-        self.items.clear()
+                self.model().clear()
