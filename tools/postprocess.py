@@ -37,9 +37,14 @@ def postprocess_text(text):
     # (Optional) Fix QFont.setWeight/setBold double
     text = re.sub(r'font\.setWeight\(75\)\s+(?=font\.setBold\(True\))', r'', text)
 
+    # (Optional) Do not create bold QFont object multiple times
+    text = re.sub(r'font = QtGui\.QFont\(\)\s+font\.setBold\(True\)\s+([\w\.]+)\.setFont\(font\)', r'\1.setFont(bold_font)', text)
+    text = re.sub(r'(def setupUi\(self, \w+\):(\s+))(?=([^\n]+\2)+?[^\n]+setFont\(bold_font\))', r'\1bold_font = QtGui.QFont()\2bold_font.setBold(True)\2', text)
+
     # (Required) Icon themes / resource loading support.
     text = re.sub(r'(\n\s+(\w+) = )QtGui\.QIcon\(\)\s+\2\.addPixmap\(QtGui\.QPixmap\(":/icons/deluge/\w+/\w+/([\w-]+).png"\).*?\)', r'\1IconLoader.themeIcon("\3")', text)
     text = re.sub(r'(\n\s+(\w+) = )QtGui\.QIcon\(\)\s+\2\.addPixmap\(QtGui\.QPixmap\(":/pixmaps/(.+?)"\).*?\)', r'\1IconLoader.customIcon("\3")', text)
+    text = re.sub(r'QtGui\.QPixmap\(":/pixmaps/(.+?)"\)', r'IconLoader.packagePixmap("/data/pixmaps/\1")', text)
     text += '\nfrom deluge_qt.ui_tools import IconLoader\n'
 
     # (Required) Qt Designer forbids the name "private"
