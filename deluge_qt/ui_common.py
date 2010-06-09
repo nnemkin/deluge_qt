@@ -32,66 +32,72 @@
 import operator
 
 from PyQt4 import QtCore, QtGui
-from twisted.internet import defer
 
 import deluge.common
 from deluge import component
 from deluge.log import LOG as log
 
-from .ui_tools import IconLoader
+from .ui_tools import IconLoader, natsortkey
 
 
-class ColumnModel(QtCore.QAbstractTableModel):
+class Column(object):
+
+    _role_map = {"text": QtCore.Qt.DisplayRole, "icon": QtCore.Qt.DecorationRole, "toolTip": QtCore.Qt.ToolTipRole,
+                 "align": QtCore.Qt.TextAlignmentRole, "checkState": QtCore.Qt.CheckStateRole,
+                 "edit": QtCore.Qt.EditRole, "user": QtCore.Qt.UserRole, "sort": QtCore.Qt.UserRole + 1}
+
+    def __init__(self, name, width=None, **kwargs):
+        self.name = name
+        self.width = width
+        self.fields = set()
+        self.formatters = {}
+        self.augment(**kwargs)
+        self.sorter = self.formatters.get(QtCore.Qt.UserRole + 1)
+
+    def augment(self, **kwargs):
+        for key, arg in kwargs.items():
+            self._add_formatter(key, arg)
+
+    def _add_formatter(self, key, arg):
+        if isinstance(arg, tuple):
+            func, fields = arg[0], arg[1:]
+            if fields:
+                formatter = lambda item: func(*(item[field] for field in fields))
+            else:
+                formatter = lambda item: func # func is a constant
+            self.fields.update(fields)
+        else:
+            formatter = operator.itemgetter(arg)
+            self.fields.add(arg)
+        self.formatters[self._role_map[key]] = formatter
+
+
+class BaseModel(QtCore.QAbstractItemModel):
 
     # NOTE: QModelIndex.internalPointer() does not count as a python reference, so care must be taken
-    # to keep referenced objects (item IDs) alive.
+    # to keep referenced objects alive.
 
     INVALID_INDEX = QtCore.QModelIndex()
 
-    class Column(object):
-
-        def __init__(self, name, width=None, **kwargs):
-            self.name = name
-            self.width = width
-            self.fields = set()
-            self.formatters = {}
-            for key, arg in kwargs.items():
-                self._add_formatter(key, arg)
-            self.sorter = self.formatters[QtCore.Qt.UserRole + 1]
-
-        def _add_formatter(self, key, arg):
-            role = {"text": QtCore.Qt.DisplayRole,
-                    "icon": QtCore.Qt.DecorationRole,
-                    "toolTip": QtCore.Qt.ToolTipRole,
-                    "user": QtCore.Qt.UserRole,
-                    "sort": QtCore.Qt.UserRole + 1}[key]
-            if isinstance(arg, tuple):
-                func, fields = arg[0], arg[1:]
-                self.formatters[role] = lambda status: func(*(status[field] for field in fields))
-                self.fields.update(fields)
-            else:
-                self.formatters[role] = operator.itemgetter(arg)
-                self.fields.add(arg)
-
     def __init__(self, parent):
-        super(ColumnModel, self).__init__(parent)
+        super(BaseModel, self).__init__(parent)
 
-        self.items = {} # dict id -> data
-        self.visual_order = [] # list of ids
-        self.columns = self._create_columns() # subclass method
-        self.sort_column = self.columns[0]
-        self.sort_reverse = False
+        self.columns = self._create_columns()
+        self._clear()
+
+        self.sort_column = None
+        self.sort_args = None
 
     def _create_columns(self):
         raise NotImplementedError
 
-    def ids_from_indices(self, indices):
-        return [index.internalPointer() for index in indices]
+    def _sort(self):
+        raise NotImplementedError
 
-    def index_from_id(self):
-        pass
+    def _clear(self):
+        raise NotImplementedError
 
-    def fields(self, isColumnHidden=None):
+    def fieldsForColumns(self, isColumnHidden=None):
         fields = set()
         for i, column in enumerate(self.columns):
             if not isColumnHidden or not isColumnHidden(i):
@@ -99,174 +105,277 @@ class ColumnModel(QtCore.QAbstractTableModel):
         fields.update(self.sort_column.fields)
         return list(fields)
 
-    def clear(self):
-        self.layoutAboutToBeChanged.emit()
-        self.items = {}
-        self.visual_order = []
-        self.layoutChanged.emit()
+    def columnsForFields(self, fields):
+        return [i for i, column in enumerate(self.columns) if bool(column.fields.intersection(fields))]
 
-    def rowCount(self, parent):
-        return len(self.visual_order)
+    def headerData(self, section, orientation, role):
+        if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
+            return _(self.columns[section].name)
 
     def columnCount(self, parent):
         return len(self.columns)
 
-    def headerData(self, section, orientation, role):
-        if role == QtCore.Qt.DisplayRole:
-            return _(self.columns[section].name)
+    def sort(self, column, order):
+        self.layoutAboutToBeChanged.emit()
+        self._sort(self.columns[column], (order == QtCore.Qt.DescendingOrder))
+        self._updatePersistentIndexes()
+        self.layoutChanged.emit()
 
-    def data(self, index, role):
-        try:
-            formatter = self.columns[index.column()].formatters[role]
-            item = self.items[index.internalPointer()]
-        except (IndexError, KeyError):
-            pass
+    def clear(self):
+        if QtCore.QT_VERSION >= 0x040600:
+            self.beginResetModel()
+            self._clear()
+            self.endResetModel()
         else:
-            return formatter(item)
+            self._clear()
+            self.reset()
 
-    def index(self, row, column, parent=INVALID_INDEX):
+    def resize_header(self, header):
+        em = header.fontMetrics().width('M') # not the actual em, but enough for initial sizing
+        for i, column in enumerate(self.columns):
+            header.resizeSection(i, column.width * em)
+
+
+class DictModel(BaseModel):
+    """Non-hierarchical model with a backing store of the form dict(item_id => dict(item_data))."""
+
+    def _clear(self):
+        self.order = []
+        self.items = {}
+
+    def _sort(self, column, reverse):
+        self.sort_column = column
+        self.sort_args = {"key": lambda id: column.sorter(self.items[id]), "reverse": reverse}
+        self.order.sort(**self.sort_args)
+
+    def rowCount(self, parent):
+        if parent.isValid():
+            return 0
+        return len(self.order)
+
+    def index(self, row, column, parent=QtCore.QModelIndex()):
         try:
-            id = self.visual_order[row]
+            return self.createIndex(row, column, self.order[row])
         except IndexError:
             return self.INVALID_INDEX
-        else:
-            return super(ColumnModel, self).createIndex(row, column, id)
 
-    def _emit_changes(self, mask, stat_row, end_row):
-        self.dataChanged.emit()
+    def parent(self, index):
+        return self.INVALID_INDEX
+
+    def data(self, index, role):
+        id = index.internalPointer()
+        if id:
+            try:
+                return self.columns[index.column()].formatters[role](self.items[id])
+            except (IndexError, KeyError):
+                pass
+
+    def _data_change_bounds(self, new_items):
+        # NOTE: current (Qt 4.6) QAbstractItemModel implementation repaints the whole viewport regardless
+        # of the arguments passed to dataChanged, so calculating precise change bounds is not really necessary
+        changed_fields = set()
+        top = bottom = None
+        for i, id in enumerate(self.items):
+            data, new_data = self.items[id], new_items[id]
+            if new_data != data:
+                changed_fields.update(field for field in new_data if new_data[field] != data.get(field))
+                if top is None:
+                    top = i
+                bottom = i
+        changed_columns = self.columnsForFields(changed_fields)
+        return top, min(changed_columns), bottom, max(changed_columns)
 
     def update(self, new_items):
-        if self.items == new_items:
+        if self.items != new_items:
+            new_order = None
+            sort_args = {"key": lambda id: self.sort_column.sorter(new_items[id]), "reverse": self.sort_args["reverse"]}
+            if len(self.items) == len(new_items):
+                try:
+                    new_order = sorted(self.order, **sort_args)
+                except KeyError:
+                    pass
+            if self.order == new_order:
+                top, left, bottom, right = self._data_change_bounds(new_items)
+                self.items = new_items
+                self.dataChanged.emit(self.index(top, left), self.index(bottom, right))
+            else:
+                self.layoutAboutToBeChanged.emit()
+                self.order = new_order or sorted(new_items.iterkeys(), **sort_args)
+                self._updatePersistentIndexes()
+                self.items = new_items # NB: updated after persistent indexes to keep old ids alive
+                self.layoutChanged.emit()
+
+    def _updatePersistentIndexes(self):
+        old_indexes, new_indexes = [], []
+        row_map = dict((id, i) for i, id in enumerate(self.order))
+        for index in self.persistentIndexList():
+            try:
+                row = row_map[index.internalPointer()]
+                if row != index.row():
+                    old_indexes.append(index)
+                    new_indexes.append(self.createIndex(row, index.column(), id))
+            except KeyError:
+                old_indexes.append(index)
+                new_indexes.append(self.INVALID_INDEX)
+        if new_indexes:
+            self.changePersistentIndexList(old_indexes, new_indexes)
+
+
+class FileModel(BaseModel):
+    """Model for torrent files list."""
+
+    NAME_SEP = "/"
+
+    filesRenamed = QtCore.pyqtSignal(object)
+    folderRenamed = QtCore.pyqtSignal(str, str)
+
+    class Item(object):
+
+        def __init__(self, parent=None, name='', model=None, index=None):
+            self.parent = parent
+            self.model = model
+            self.name = name
+            self.index = index
+            if parent:
+                parent.children.append(self)
+            self.children = []
+
+        def __getitem__(self, name):
+            return getattr(self, name) # assume exception is never thrown
+
+        def is_file(self):
+            return self.index is not None
+
+        @property
+        def size(self):
+            if self.is_file():
+                return self.model.files[self.index]["size"]
+            return sum(child.size for child in self.children)
+
+        def row(self):
+            if self.parent:
+                try:
+                    return self.parent.children.index(self)
+                except ValueError:
+                    pass
+
+        def invalidate(self):
+            self.parent = None
+            for child in self.children:
+                child.invalidate()
+
+        def sort(self, **kwargs):
+            self.children.sort(**kwargs)
+            for child in self.children:
+                child.sort(**kwargs)
+
+
+    def __init__(self, parent):
+        super(FileModel, self).__init__(parent)
+
+    def _create_columns(self):
+        icon_file_folder = (IconLoader.themeIcon("text-x-generic"), IconLoader.themeIcon("folder"))
+        ficon = lambda index: icon_file_folder[index is None]
+
+        return [Column('Filename', text="name", icon=(ficon, "index"), edit="name", sort=(natsortkey, "name"), width=45),
+                Column('Size', text=(deluge.common.fsize, "size"), sort="size", width=10)]
+
+    def _sort(self, column, reverse):
+        self.sort_args = {"key": column.sorter, "reverse": reverse}
+        self.root.sort(**self.sort_args)
+
+    def _clear(self):
+        self.root = self.Item()
+        self.files = {}
+        self.file_items = []
+
+    def rowCount(self, parent):
+        if parent.column() > 0:
+            return 0
+        return len((parent.internalPointer() or self.root).children)
+
+    def index(self, row, column, parent=QtCore.QModelIndex()):
+        try:
+            return self.createIndex(row, column, (parent.internalPointer() or self.root).children[row])
+        except IndexError:
+            return self.INVALID_INDEX
+
+    def parent(self, index):
+        item = index.internalPointer()
+        if item:
+            parent = item.parent
+            if parent and parent != self.root:
+                return self.createIndex(parent.row(), 0, parent)
+        return self.INVALID_INDEX
+
+    def data(self, index, role):
+        item = index.internalPointer()
+        if item:
+            try:
+                return self.columns[index.column()].formatters[role](item)
+            except (IndexError, KeyError):
+                pass
+
+    def update(self, files):
+        if self.files == files:
             return
 
-        sort_args = {"key": lambda id: self.sort_column.sorter(new_items[id]), "reverse": self.sort_reverse}
-        if len(self.items) == len(new_items):
-            try:
-                self.visual_order.sort(**sort_args)
-            except KeyError:
-                pass # new items are present
-            else:
-                # items are the same (and sorted properly), send dataChanged
-                changed_fields = set()
-                for id, data in self.items:
-                    new_data = new_items[id]
-                    changed_fields.update(field for field in new_data if new_data[field] != data.get(field))
-                changed_columns = [i for i, column in enumerate(self.columns) if column.fields.issubset(changed_fields)]
-
-                self.items = new_items
-                self.dataChanged.emit(self.index(0, min(changed_columns)),
-                                      self.index(len(self.items), max(changed_columns)))
-                return
-
-        # items are different, sort anew and send layoutChanged
-        self.layoutAboutToBeChanged.emit()
-        self.visual_order = sorted(new_items.iterkeys(), **sort_args)
-        self._update_persistent_indices()
-        self.items = new_items
-        self.layoutChanged.emit()
-
-    def sort(self, column, order):
-        self.sort_column = self.columns[column]
-        self.sort_reverse = (order == QtCore.Qt.DescendingOrder)
-        self.layoutAboutToBeChanged.emit()
-        self.visual_order.sort(key=lambda id: self.sort_column.sorter(self.items[id]), reverse=self.sort_reverse)
-        self._update_persistent_indices()
-        self.layoutChanged.emit()
-
-    def _update_persistent_indices(self):
-        indices = self.persistentIndexList()
-        row_map = dict((id, row) for row, id in enumerate(self.visual_order))
-        new_indices = []
-        for index in indices:
-            id = index.internalPointer()
-            try:
-                new_index = self.createIndex(row_map[id], index.column(), id)
-            except KeyError:
-                new_index = self.INVALID_INDEX
-            new_indices.append(new_index)
-        self.changePersistentIndexList(indices, new_indices)
-
-
-class FileItem(QtGui.QTreeWidgetItem):
-    """Generic file item for file trees. Provides name and size columns."""
-
-    _icon_folder = IconLoader.themeIcon("folder")
-    _icon_file = IconLoader.themeIcon("text-x-generic")
-
-    def __init__(self, parent=None, name="", file=None):
-        if isinstance(parent, list):
-            parent.append(self)
-            parent = None
-        super(FileItem, self).__init__(parent)
-        self.setText(0, name)
-        self.setIcon(0, self._icon_file if file else self._icon_folder)
-        self.file = file
-
-    def _update_size(self):
-        total_size = self.file["size"] if self.file else 0
-        for item in self.children():
-            total_size += item._update_size()
-        self.setText(1, deluge.common.fsize(total_size))
-        return total_size
-
-    def setData(self, column, role, value):
-        if column == 0 and role == QtCore.Qt.DisplayRole:
-            # TODO: advanced renaming
-            if "\\" in value or "/" in value:
-                return
-
-        super(FileItem, self).setData(column, role, value)
-
-    def children(self):
-        return (self.child(i) for i in xrange(self.childCount()))
-
-
-class FileItemRoot(object):
-    """Fake root item used to collect top level items for batch insertion in QTreeWidget."""
-
-    item_type = FileItem
-    name_sep = "/"
-
-    def __init__(self, files):
+        self.clear()
         level = 0
-        self._top_items = item = []
-        self._file_items = [None] * len(files)
+        parent = self.root
         prev_names = []
+        i = 0
         for file in sorted(files, key=operator.itemgetter("path")):
-            names = file["path"].split(self.name_sep)
+            names = file["path"].split(self.NAME_SEP)
             while names[:level] != prev_names[:level]: # XXX
-                item = item.parent()
+                parent = parent.parent # ascend
                 level -= 1
             while len(names) - 1 > level:
-                item = self.item_type(item, names[level])
+                parent = self.Item(parent, names[level]) # descend
                 level += 1
+            self.file_items.append(self.Item(parent, names[-1], self, i))
+            i += 1
             prev_names = names
-            self._file_items[file["index"]] = self.item_type(item, names[-1], file)
-
-        for item in self._top_items:
-            item._update_size()
 
         self.files = files
-        self.file = None
 
-    def children(self):
-        return self._top_items
+    def flags(self, index):
+        flags = super(FileModel, self).flags(index) | QtCore.Qt.ItemIsDragEnabled
+        if index.column() == 0:
+            flags |= QtCore.Qt.ItemIsEditable
+        item = index.internalPointer()
+        if not item or not item.is_file(): # NB: invalid index (not item) means root
+            flags |= QtCore.Qt.ItemIsDropEnabled
+        return flags
 
-    def text(self, column):
-        return ""
+    def setData(self, index, value, role):
+        item = index.internalPointer()
+        if item and index.column() == 0 and role == QtCore.Qt.EditRole:
+            if item.is_file():
+                self.filesRenamed.emit([(item.index, value)])
+            else:
+                self.folderRenamed.emit(item.path(), value)
+            return True
+        return False
 
-    def addTo(self, widget):
-        widget.clear()
-        widget.addTopLevelItems(self._top_items)
-        for item in self._top_items:
-            item.setExpanded(True)
-
-    def takeFrom(self, widget):
-        self._top_items = widget.invisibleRootItem().takeChildren()
+    def _updatePersistentIndexes(self):
+        old_indexes, new_indexes = [], []
+        prev_item = None
+        for index in self.persistentIndexList():
+            item = index.internalPointer()
+            if item != prev_item: # selection indexes often come in rows, save an row() call if possible
+                row = item.row()
+                prev_item = item
+            if row is not None and row != index.row():
+                old_indexes.append(index)
+                new_indexes.append(self.createIndex(row, index.column(), item))
+        if new_indexes:
+            self.changePersistentIndexList(old_indexes, new_indexes)
 
 
 class WidgetLoader(object):
-    """Helper to quickly load config dicts from and to form widgets. Requires special widget naming scheme."""
+    """Helper to quickly load config dicts into and from form widgets. Requires special widget naming scheme
+       (see _sync_widgets)."""
 
     @staticmethod
     def _set_value(widget, value):
@@ -346,18 +455,21 @@ class WidgetLoader(object):
 
 class _TrackerIconsCache(object):
 
-    EMPTY_ICON = QtGui.QIcon()
-
     def __init__(self):
-        self._icons = {"": None}
+        self._icons = {None: QtGui.QIcon()}
 
-    @defer.inlineCallbacks
-    def __call__(self, host):
+    def _create_icon(self, filename):
         try:
-            defer.returnValue(self._icons[host])
+            return self._icons[filename]
         except KeyError:
-            filename = yield component.get("TrackerIcons").get(host)
-            self._icons[host] = icon = QtGui.QIcon(filename) if filename else self.EMPTY_ICON
-            defer.returnValue(icon)
+            pix = QtGui.QPixmap(filename)
+            if not pix.hasAlpha():
+                pix.setMask(pix.createHeuristicMask())
+            self._icons[filename] = icon = QtGui.QIcon(pix)
+            icon.addPixmap(pix, mode=QtGui.QIcon.Selected)
+            return icon
+
+    def get(self, host):
+        return component.get("TrackerIcons").get_filename(host).addCallback(self._create_icon)
 
 TrackerIconsCache = _TrackerIconsCache()

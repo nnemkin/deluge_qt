@@ -42,8 +42,8 @@ from deluge.ui.common import TorrentInfo
 from deluge.configmanager import ConfigManager
 
 from .generated.ui import Ui_AddTorrentsDialog, Ui_AddHashDialog, Ui_AddUrlDialog
-from .ui_tools import QtBug7674ItemDelegate
-from .ui_common import FileItem, FileItemRoot, WidgetLoader
+from .ui_tools import HeightFixItemDelegate
+from .ui_common import WidgetLoader, FileModel
 
 
 class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
@@ -69,17 +69,19 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
 
         self.download_location_browse.setVisible(client.is_localhost())
 
+        self.tree_files.setModel(TorrentFileModel([], self.tree_files))
         header = self.tree_files.header()
+        header.setStretchLastSection(False)
+        header.setMinimumSectionSize(header.fontMetrics().width("M") * 10)
         header.setResizeMode(0, QtGui.QHeaderView.Stretch)
         header.setResizeMode(1, QtGui.QHeaderView.Fixed) # NB: ResizeToContents is slow
-        header.setDefaultSectionSize(self.tree_files.fontMetrics().width("M") * 12)
 
-        QtBug7674ItemDelegate.install(self.tree_files)
+        HeightFixItemDelegate.install(self.tree_files)
 
-        self.start()
+        self._update_default_options()
 
     @defer.inlineCallbacks
-    def start(self):
+    def _update_default_options(self):
         core_config = yield client.core.get_config_values(self._core_keys_to_torrent_keys.keys())
         self.default_options = dict((self._core_keys_to_torrent_keys[k], v) for k, v in core_config.items())
 
@@ -125,7 +127,7 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
         # XXX: unlink tmp_file?
 
     def add_torrents(self, uris):
-        """Handles lists of local filenames or magnet uris"""
+        """Handles lists of local filenames or magnet uris."""
         torrent = None
         for uri in uris:
             try:
@@ -144,11 +146,11 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
 
     def _save_options(self, torrent):
         torrent.options.update(WidgetLoader.from_widgets(self, self.default_options))
-        torrent.file_root.takeFrom(self.tree_files)
 
     def _load_options(self, torrent):
         WidgetLoader.to_widgets(torrent.options or self.default_options, self)
-        torrent.file_root.addTo(self.tree_files)
+        self.tree_files.setModel(torrent.file_model)
+        self.tree_files.expandToDepth(0)
 
     @QtCore.pyqtSlot()
     def on_button_file_clicked(self):
@@ -241,7 +243,7 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
             if deluge.common.is_magnet(torrent.filename):
                 client.core.add_torrent_magnet(torrent.filename, torrent.options)
             else:
-                torrent.options.update(torrent.file_root.file_options())
+                torrent.options.update(torrent.file_model.file_options())
                 client.core.add_torrent_file(torrent.filename, base64.encodestring(torrent.filedata), torrent.options)
 
         super(AddTorrentsDialog, self).accept()
@@ -275,7 +277,7 @@ class TorrentItem(QtGui.QListWidgetItem):
             self.filename = os.path.basename(uri)
             self.info_hash = info.info_hash
             self.filedata = info.filedata
-            self.file_root = TorrentFileRoot(info.files)
+            self.file_model = TorrentFileModel(info.files, None)
             self.setText(info.name)
 
         self.options = {}
@@ -285,39 +287,71 @@ class TorrentItem(QtGui.QListWidgetItem):
         return other and other.info_hash == self.info_hash
 
 
-class TorrentFileItem(FileItem):
+class TorrentFileModel(FileModel):
 
-    _flags_file = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable # TODO | QtCore.Qt.ItemIsDragEnabled
-    _flags_folder = _flags_file | QtCore.Qt.ItemIsTristate | QtCore.Qt.ItemIsDropEnabled
+    NAME_SEP = os.sep
 
-    def __init__(self, parent, name, file=None):
-        super(TorrentFileItem, self).__init__(parent, name, file)
+    class Item(FileModel.Item):
 
-        self.setFlags(self._flags_file if file else self._flags_folder)
-        self.setCheckState(0, QtCore.Qt.Checked)
-        self.setTextAlignment(1, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        @property
+        def checkState(self):
+            if self.is_file():
+                return QtCore.Qt.Checked if self.model.priorities[self.index] else QtCore.Qt.Unchecked
+            else:
+                children_states = list(frozenset(child.checkState for child in self.children))
+                return children_states[0] if len(children_states) == 1 else QtCore.Qt.PartiallyChecked
 
+        # @checkState.setter
+        def setCheckState(self, state):
+            if self.is_file():
+                self.model.priorities[self.index] = (state == QtCore.Qt.Checked)
+            else:
+                for child in self.children:
+                    child.setCheckState(state)
 
-class TorrentFileRoot(FileItemRoot):
+    def __init__(self, files, parent):
+        super(TorrentFileModel, self).__init__(parent)
+        super(TorrentFileModel, self).update(files)
 
-    item_type = TorrentFileItem
-    name_sep = os.sep
-
-    def __init__(self, files):
-        # we need file["index"] not provided by TorrentInfo
-        files = [{"path": file["path"], "size": file["size"], "index": i} for i, file in enumerate(files)]
-        super(TorrentFileRoot, self).__init__(files)
+        self.priorities = [1] * len(files)
 
     def file_options(self):
-        return {"mapped_files": self._mapped_files('', self, {}),
-                "file_priorities": [item.checkState(0) == QtCore.Qt.Checked for item in self._file_items]}
+        return {"mapped_files": [],
+                "file_priorities": self.priorities}
+
+    def _create_columns(self):
+        columns = super(TorrentFileModel, self)._create_columns()
+        columns[0].augment(checkState="checkState")
+        columns[1].augment(align=(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,))
+        return columns
 
     def _mapped_files(self, path, item, mapping):
-        new_path = os.path.join(path, item.text(0))
-        if item.file:
+        new_path = os.path.join(path, item.name)
+        if item.is_file():
             if item.file["path"] != new_path:
-                mapping[item.index] = new_path
+                pass # FIXME mapping[item.index] = new_path
         else:
-            for child in item.children():
+            for child in item.children:
                 self._mapped_files(new_path, child, mapping)
         return mapping
+
+    def flags(self, index):
+        flags = super(FileModel, self).flags(index)
+        if index.column() == 0:
+            flags |= QtCore.Qt.ItemIsUserCheckable
+        return flags
+
+    def setData(self, index, value, role):
+        if super(TorrentFileModel, self).setData(index, value, role):
+            return True
+
+        item = index.internalPointer()
+        if item and index.column() == 0 and role == QtCore.Qt.CheckStateRole:
+            item.setCheckState(QtCore.Qt.Checked if item.checkState != QtCore.Qt.Checked else QtCore.Qt.Unchecked)
+            self.dataChanged.emit(index.child(0, 0), index.child(self.rowCount(index), 0))
+            while index.isValid():
+                self.dataChanged.emit(index, index)
+                index = index.parent()
+            return True
+
+        return False

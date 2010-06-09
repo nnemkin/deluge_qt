@@ -34,145 +34,160 @@ from twisted.internet import defer
 
 import deluge.common
 from deluge.ui.client import client
-from deluge import component, configmanager
+from deluge import component
 
-from .ui_tools import ProgressBarDelegate, HeightFixItemDelegate, IconLoader, treeContextMenuHandler
-from .ui_common import FileItem, FileItemRoot
+from .ui_tools import ProgressBarDelegate, HeightFixItemDelegate, IconLoader, HeaderActionList, context_menu_pos
+from .ui_common import FileModel, Column
 
 
-class TorrentFileItem(FileItem):
+class FileViewModel(FileModel):
 
-    _flags_file = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable # TODO | QtCore.Qt.ItemIsDragEnabled
-    _flags_folder = _flags_file | QtCore.Qt.ItemIsTristate | QtCore.Qt.ItemIsDropEnabled
-
-    _priority_icons = {0: IconLoader.customIcon("gtk-no.png"),
+    _priority_icons = {None: QtGui.QIcon(),
+                       0: IconLoader.customIcon("gtk-no.png"),
                        1: IconLoader.customIcon("gtk-yes.png"),
                        2: IconLoader.themeIcon("go-up"),
                        5: IconLoader.themeIcon("go-top")}
 
-    column_names = ["Filename", "Size", "Progress", "Priority"]
-    column_widths = [45, 10, 10, 10]
+    class Item(FileModel.Item):
 
-    def __init__(self, parent, name, file=None):
-        super(TorrentFileItem, self).__init__(parent, name, file)
+        @property
+        def progress(self):
+            if self.is_file():
+                return self.model.progress[self.index]
+            else:
+                return sum(child.progress for child in self.children) / len(self.children)
 
-        self.setFlags(self._flags_file if file else self._flags_folder)
-        self.setTextAlignment(1, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        @property
+        def priority(self):
+            if self.is_file():
+                return self.model.priorities[self.index]
+            else:
+                if len(frozenset(child.priority for child in self.children)) == 1:
+                    return self.children[0].priority
 
-    def setSortColumn(self, column):
-        pass
+    def __init__(self, files, parent):
+        super(FileViewModel, self).__init__(parent)
+        super(FileViewModel, self).update(files)
 
-    def update(self, progress, priority):
-        self.setText(2, deluge.common.fpcnt(progress))
-        self.setData(2, QtCore.Qt.UserRole, progress)
-        self.setText(3, _(deluge.common.FILE_PRIORITY[priority]))
-        self.setIcon(3, self._priority_icons.get(priority))
+        self.priorities = self.progress = [0] * len(files)
+        self._expanded = []
 
+    def _create_columns(self):
+        fprio = lambda p: _(deluge.common.FILE_PRIORITY[p]) if p is not None else ''
 
-class TorrentFileRoot(FileItemRoot):
-
-    item_type = TorrentFileItem
-    name_sep = "/"
-
-    def __init__(self, files, progress, priorities):
-        super(TorrentFileRoot, self).__init__(files)
-
-        self.update(progress, priorities)
-
-    def file_priorities(self):
-        return [item.data(3, QtCore.Qt.UserRole) for item in self._file_items]
+        columns = super(FileViewModel, self)._create_columns()
+        columns += [Column("Progress", text=(deluge.common.fpcnt, "progress"), user="progress", width=12),
+                    Column("Priority", text=(fprio, "priority"), icon=(self._priority_icons.get, "priority"), width=12)]
+        return columns
 
     def update(self, progress, priorities):
-        for i, item in enumerate(self._file_items):
-            item.update(progress[i], priorities[i])
+        if self.progress != progress or self.priorities != priorities:
+            self.progress = progress
+            self.priorities = priorities
+
+            active_range = self.columnsForFields(["progress", "priority"])
+            active_range = min(active_range), max(active_range)
+            self.dataChanged.emit(self.index(0, active_range[0]),
+                                  self.index(len(self.root.children) - 1, active_range[1]))
 
 
-class FileView(QtGui.QTreeWidget, component.Component):
+class FileView(QtGui.QTreeView, component.Component):
+
+    EMPTY_MODEL = FileViewModel([], None)
 
     def __init__(self, parent=None):
         QtGui.QTreeWidget.__init__(self, parent)
         component.Component.__init__(self, "FileView", interval=2)
 
-        self.ui_config = configmanager.ConfigManager('qtui.conf')
-
         self.torrent_ids = []
-        self.items = {}
-        self.files_cache = {}
+        self.file_models = {}
+
+        self.setModel(self.EMPTY_MODEL)
+        self.model().resize_header(self.header())
 
         HeightFixItemDelegate.install(self)
-        self.setHeaderLabels(TorrentFileItem.column_names)
         self.setItemDelegateForColumn(2, ProgressBarDelegate(self))
 
-        self.header().sortIndicatorChanged.connect(self.on_header_sortIndicatorChanged)
-
         client.register_event_handler("TorrentFileRenamedEvent", self.on_client_torrentFileRenamed)
-        client.register_event_handler("TorrentFolderRenamedEvent", self.on_client_torrentFileRenamed)
+        client.register_event_handler("TorrentFolderRenamedEvent", self.on_client_torrentFolderRenamed)
         client.register_event_handler("TorrentRemovedEvent", self.on_client_torrentRemoved)
 
-        try:
-            self.header().restoreState(QtCore.QByteArray.fromBase64(self.ui_config['file_view_state']))
-        except KeyError:
-            em = self.header().fontMetrics().width('M')
-            for i, width in enumerate(TorrentFileItem.column_widths):
-                self.header().resizeSection(i, width * em)
+        HeaderActionList(self)
 
     def start(self):
         pass
 
     def stop(self):
-        pass
+        self.setModel(self.EMPTY_MODEL)
+        self.file_models.clear()
+        self.torrent_ids.clear()
 
-    def shutdown(self):
-        self.ui_config['file_view_state'] = self.header().saveState().toBase64().data()
+    def showEvent(self, event):
+        self.update()
+        super(FileView, self).showEvent(event)
 
     @defer.inlineCallbacks
     def update(self):
         if self.torrent_ids and self.isVisible():
             fields = ["compact", "file_progress", "file_priorities"]
-            try:
-                files = self.files_cache[self.torrent_ids[0]]
-            except KeyError:
-                files = None
+
+            model = self.file_models.get(self.torrent_ids[0])
+            if not model:
                 fields.append("files")
 
             status = yield component.get("SessionProxy").get_torrent_status(self.torrent_ids[0], fields)
-            if not files:
-                self.files_cache[self.torrent_ids[0]] = files = status["files"]
+            if not model:
+                self.file_models[self.torrent_ids[0]] = model = FileViewModel(status["files"], self)
+                model.filesRenamed.connect(self.on_model_filesRenamed)
+                model.folderRenamed.connect(self.on_model_folderRenamed)
+                self.setModel(model)
+                self.expandToDepth(0)
 
-            if not self.topLevelItemCount():
-                TorrentFileRoot(files, status["file_progress"], status["file_priorities"]).addTo(self)
+            model.update(status["file_progress"], status["file_priorities"])
 
     def contextMenuEvent(self, event):
-        treeContextMenuHandler(self, event, component.get("MainWindow").popup_menu_files)
+        pos = context_menu_pos(self, event)
+        if pos:
+            component.get("MainWindow").popup_menu_files.popup(pos)
 
-    def on_client_torrentFileRenamed(self, torrent_id, *args):
+    @QtCore.pyqtSlot(object)
+    def on_model_filesRenamed(self, renames):
+        client.core.rename_files(self.torrent_ids[0], renames)
+
+    @QtCore.pyqtSlot(str, str)
+    def on_model_folderRenamed(self, old_name, new_name):
+        client.core.rename_folder(self.torrent_ids[0], old_name, new_name)
+
+    def on_client_torrentFileRenamed(self, torrent_id, index, name):
         try:
-            del self.files_cache[torrent_id]
+            self.file_models[torrent_id].renameFile(index, name)
         except KeyError:
             pass
-        else:
-            if self.torrent_ids[0] == torrent_id:
-                self.update()
+
+    def on_client_torrentFolderRenamed(self, torrent_id, old_name, new_name):
+        try:
+            self.file_models[torrent_id].renameFonler(old_name, new_name)
+        except KeyError:
+            pass
 
     def on_client_torrentRemoved(self, torrent_id):
-        self.on_client_torrentFileRenamed(torrent_id)
-
-    def _clear(self):
-        pass
+        self.file_models.pop(torrent_id)
 
     @QtCore.pyqtSlot(object)
     def set_torrent_ids(self, torrent_ids):
         if self.torrent_ids != torrent_ids:
             self.torrent_ids = torrent_ids
-            self.clear()
             if torrent_ids:
+                try:
+                    model = self.file_models[self.torrent_ids[0]]
+                except KeyError:
+                    pass
+                else:
+                    self.setModel(model)
+                    self.expandToDepth(0)
                 self.update()
-
-    @QtCore.pyqtSlot(int, QtCore.Qt.SortOrder)
-    def on_header_sortIndicatorChanged(self, index, order):
-        pass
-        #for item in self.items.itervalues():
-        #    item.setSortColumn(index)
+            else:
+                self.setModel(self.EMPTY_MODEL)
 
     @QtCore.pyqtSlot(QtGui.QTreeWidgetItem, int)
     @defer.inlineCallbacks

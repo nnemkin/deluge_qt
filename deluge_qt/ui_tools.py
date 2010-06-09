@@ -30,29 +30,20 @@
 #
 
 import os
+import re
 import pkg_resources
 
 from PyQt4 import QtGui, QtCore
 from xdg import IconTheme
 
-from deluge.log import LOG as log
 import deluge.common
+from deluge import configmanager
 
 from .lang_tools import memoize
 
 
-def header_view_actions(widget):
-    def section_action_triggered():
-        pass
-
-    model = widget.model()
-    return [QtGui.QAction(model.headerData(i, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole), widget.header(),
-                          checked=True,
-                          checkable=True,
-                          triggered=section_action_triggered) for i in xrange(model.columnCount())]
-
-
 class TextProgressBar(QtGui.QProgressBar):
+    """QProgressBar variant with the ability to set arbitrary label text."""
 
     def __init__(self, parent=None):
         super(TextProgressBar, self).__init__(parent)
@@ -68,6 +59,7 @@ class TextProgressBar(QtGui.QProgressBar):
 
 
 class ProgressBarDelegate(QtGui.QStyledItemDelegate):
+    """Paint progress bar with the label given by DisplayRole and progress given by UserRole (float in [0;1] range)."""
 
     def __init__(self, parent=None):
         QtGui.QItemDelegate.__init__(self, parent)
@@ -109,37 +101,12 @@ class HeightFixItemDelegate(QtGui.QStyledItemDelegate):
         return self._sizeHint
 
 
-class QtBug7674ItemDelegate(HeightFixItemDelegate):
-    """QTBUG-7674 workaround (incorrect tristate behavior of item checkboxes), affected versions are 4.6.0-4.6.2."""
-
-    @classmethod
-    def install(cls, widget):
-        if QtCore.QT_VERSION >= 0x040600 and QtCore.QT_VERSION <= 0x040602:
-            log.debug("QTBUG-7674 workaround in effect")
-            widget.setItemDelegate(cls(widget))
-
-    class Proxy(QtGui.QAbstractProxyModel):
-
-        def mapFromSource(self, arg): return arg
-        def mapToSource(self, arg): return arg
-        def flags(self, index): return self.sourceModel().flags(index) & ~QtCore.Qt.ItemIsTristate
-
-    def __init__(self, parent=None):
-        super(QtBug7674ItemDelegate, self).__init__(parent)
-        self._proxy = self.Proxy(self)
-
-    def editorEvent(self, event, model, option, index):
-        if self._proxy.sourceModel() != model:
-            self._proxy.setSourceModel(model)
-        return super(QtBug7674ItemDelegate, self).editorEvent(event, self._proxy, option, index)
-
-
 class _IconLoader(object):
 
     def __init__(self):
         if not QtGui.QIcon.themeName(): # native theme support not available
             self.setThemeSearchPaths([pkg_resources.resource_filename("deluge_qt", "data/icons"),
-                                             pkg_resources.resource_filename("deluge", "data/icons")])
+                                      pkg_resources.resource_filename("deluge", "data/icons")])
             self.setThemeName("deluge")
 
     def setThemeName(self, name):
@@ -151,15 +118,21 @@ class _IconLoader(object):
     def themeIcon(self, name, fallback=None):
         return QtGui.QIcon.fromTheme(name, fallback or QtGui.QIcon())
 
-    def packageIcon(self, path):
+    def packageIcon(self, *paths):
         icon = QtGui.QIcon()
-        paths = (path,) if isinstance(path, basestring) else path
         for package in ("deluge", "deluge_qt"): # XXX: transient package name
             for path in paths:
                 icon_file = pkg_resources.resource_filename(package, path)
                 if os.path.isfile(icon_file):
                     icon.addFile(icon_file)
         return icon
+
+    def packagePixmap(self, path):
+        for package in ("deluge", "deluge_qt"): # XXX: transient package name
+            filename = pkg_resources.resource_filename(package, path)
+            if os.path.isfile(filename):
+                return QtGui.QPixmap(filename)
+        return QtGui.QPixmap()
 
     @memoize
     def customIcon(self, name):
@@ -206,14 +179,13 @@ class _CompatIconLoader(_IconLoader):
     @memoize
     def themeIcon(self, name, fallback=None):
         # poor man's icon loader
-
         icon = QtGui.QIcon()
         for theme_dirs in self._theme_dirs:
             for dir, scalable in theme_dirs:
                 icon_file = "%s/%s.%s" % (dir, name, 'svg' if scalable else 'png')
                 if os.path.isfile(icon_file):
                     icon.addFile(icon_file)
-            if not icon.isNull(): # XXX: use availableSizes() in PyQt 4.5+
+            if not icon.isNull():
                 return icon
 
         return fallback or QtGui.QIcon()
@@ -225,13 +197,77 @@ else:
     IconLoader = _CompatIconLoader()
 
 
-def treeContextMenuHandler(widget, event, menu):
-    """Calculate global popup menu position from QTreeWidget's QContextMenuEvent"""
-    items = widget.selectedItems()
-    if items:
+def context_menu_pos(view, event):
+    """Calculate global popup menu position from QAbstractItmView's QContextMenuEvent"""
+    current_index = view.currentIndex()
+    if current_index.isValid():
         if event.reason() == QtGui.QContextMenuEvent.Keyboard:
-            item_rect = widget.visualItemRect(items[0])
-            pos = widget.viewport().mapToGlobal(QtCore.QPoint(widget.width() / 5, item_rect.bottom()))
+            if view.allColumnsShowFocus():
+                current_index = current_index.sibling(current_index.row(), 0)
+            item_rect = view.visualRect(current_index)
+            x, y = item_rect.left() + 8, (item_rect.top() + item_rect.bottom()) / 2
+            pos = view.viewport().mapToGlobal(QtCore.QPoint(x, y))
         else:
             pos = event.globalPos()
-        menu.popup(pos)
+        return pos
+
+
+class HeaderActionList(QtGui.QActionGroup):
+
+    def __init__(self, view):
+        super(HeaderActionList, self).__init__(view)
+        self.setExclusive(False)
+
+        model = view.model()
+        for i in xrange(model.columnCount(QtCore.QModelIndex())):
+            self.addAction(QtGui.QAction(model.headerData(i, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole),
+                                         self, checked=not view.isColumnHidden(i), checkable=True)).setData(i)
+        view.header().setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+        view.header().addActions(self.actions())
+
+        self.triggered.connect(self._triggered)
+
+    @QtCore.pyqtSlot(QtGui.QAction)
+    def _triggered(self, action):
+        self.parent().setColumnHidden(action.data(), not action.isChecked())
+
+
+class WindowStateMixin(object):
+
+    def __init__(self, window_state_variable=None):
+        self.__ui_config = configmanager.ConfigManager("qtui.conf")
+        self.window_state_variable = window_state_variable or self.objectName()
+        try:
+            state = self.__ui_config[self.window_state_variable]
+        except KeyError:
+            pass
+        else:
+            if "geometry" in state:
+                self.restoreGeometry(QtCore.QByteArray.fromBase64(state["geometry"]))
+            for key, widget in self._widgetsWithState():
+                if key in state:
+                    widget.restoreState(QtCore.QByteArray.fromBase64(state[key]))
+
+    def saveWindowState(self):
+        state = {"geometry": str(self.saveGeometry().toBase64())}
+        for key, widget in self._widgetsWithState():
+            state[key] = str(widget.saveState().toBase64())
+        self.__ui_config[self.window_state_variable] = state
+
+    def _widgetsWithState(self):
+        from .torrent_details import TorrentDetails # TorrentDetails is a special QTabWidget with a state
+        if isinstance(self, QtGui.QMainWindow):
+            yield "state", self
+        for child in sum((self.findChildren(cls) for cls in (QtGui.QSplitter, QtGui.QHeaderView, TorrentDetails)), []):
+            yield (child.objectName() or child.parent().objectName()), child
+
+
+def natsortkey(s):
+    key = []
+    for part in re.split('(\d+)', s.lower()):
+        try:
+            part = int(part)
+        except:
+            pass
+        key.append(part)
+    return key

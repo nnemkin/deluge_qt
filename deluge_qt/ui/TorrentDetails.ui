@@ -693,6 +693,9 @@
     </property>
     <item>
      <widget class="FileView" name="tree_files">
+      <property name="dragEnabled">
+       <bool>true</bool>
+      </property>
       <property name="selectionMode">
        <enum>QAbstractItemView::ExtendedSelection</enum>
       </property>
@@ -705,11 +708,12 @@
       <property name="allColumnsShowFocus">
        <bool>true</bool>
       </property>
-      <column>
-       <property name="text">
-        <string notr="true">1</string>
-       </property>
-      </column>
+      <attribute name="headerStretchLastSection">
+       <bool>false</bool>
+      </attribute>
+      <attribute name="headerStretchLastSection">
+       <bool>false</bool>
+      </attribute>
      </widget>
     </item>
    </layout>
@@ -740,11 +744,6 @@
       <property name="allColumnsShowFocus">
        <bool>true</bool>
       </property>
-      <column>
-       <property name="text">
-        <string notr="true">1</string>
-       </property>
-      </column>
      </widget>
     </item>
    </layout>
@@ -766,29 +765,29 @@
   <customwidget>
    <class>TorrentDetails</class>
    <extends>QTabWidget</extends>
-   <header location="global">deluge_qt.torrent_details</header>
+   <header>deluge_qt.torrent_details</header>
    <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>PeerView</class>
-   <extends>QTreeWidget</extends>
-   <header location="global">deluge_qt.peer_view</header>
-  </customwidget>
-  <customwidget>
-   <class>FileView</class>
-   <extends>QTreeWidget</extends>
-   <header location="global">deluge_qt.file_view</header>
   </customwidget>
   <customwidget>
    <class>TextProgressBar</class>
    <extends>QProgressBar</extends>
-   <header location="global">deluge_qt.ui_tools</header>
+   <header>deluge_qt.ui_tools</header>
   </customwidget>
   <customwidget>
    <class>TorrentOptions</class>
    <extends>QWidget</extends>
-   <header location="global">deluge_qt.torrent_options</header>
+   <header>deluge_qt.torrent_options</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>FileView</class>
+   <extends>QTreeView</extends>
+   <header>deluge_qt.file_view</header>
+  </customwidget>
+  <customwidget>
+   <class>PeerView</class>
+   <extends>QTreeView</extends>
+   <header>deluge_qt.peer_view</header>
   </customwidget>
  </customwidgets>
  <resources>

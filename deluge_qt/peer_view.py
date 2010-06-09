@@ -1,3 +1,4 @@
+
 #
 # peer_view.py
 #
@@ -36,16 +37,17 @@ from twisted.python.compat import inet_pton
 from twisted.internet import defer
 
 from deluge.log import LOG as log
-from deluge import component, configmanager
 from deluge.ui.countries import COUNTRIES
 
 import deluge.common
-from .ui_tools import ProgressBarDelegate, HeightFixItemDelegate, IconLoader
-from .ui_common import ColumnModel
+from deluge import component
+
 from .lang_tools import memoize
+from .ui_tools import ProgressBarDelegate, HeightFixItemDelegate, IconLoader
+from .ui_common import DictModel, Column
 
 
-class PeerViewModel(ColumnModel):
+class PeerViewModel(DictModel):
 
     def _create_columns(self):
         peer_seed_icon = (IconLoader.customIcon("downloading16.png"), IconLoader.customIcon("seeding16.png"))
@@ -63,13 +65,13 @@ class PeerViewModel(ColumnModel):
             addr = inet_pton(socket.AF_INET6 if ':' in addr else socket.AF_INET, addr)
             return (addr, port)
 
-        return [self.Column("", icon=(flag_icon, "country"), toolTip=(COUNTRIES.get, "country"), sort="country", width=3),
-                self.Column("Address", text="ip", icon=(lambda flag: peer_seed_icon[bool(flag)], "seed"),
-                            sort=(ip_sort_key, "total_wanted"), width=20),
-                self.Column("Client", text="client", sort="client", width=15),
-                self.Column("Progress", text=(deluge.common.fpcnt, "progress"), user="progress", sort="progress", width=15),
-                self.Column("Down Speed", text=(deluge.common.fspeed, "down_speed"), sort="down_speed", width=10),
-                self.Column("Up Speed", text=(deluge.common.fspeed, "up_speed"), sort="up_speed", width=10)]
+        return [Column("", icon=(flag_icon, "country"), toolTip=(COUNTRIES.get, "country"), sort="country", width=3),
+                Column("Address", text="ip", icon=(lambda flag: peer_seed_icon[bool(flag)], "seed"),
+                       sort=(ip_sort_key, "total_wanted"), width=20),
+                Column("Client", text="client", sort="client", width=15),
+                Column("Progress", text=(deluge.common.fpcnt, "progress"), user="progress", sort="progress", width=15),
+                Column("Down Speed", text=(deluge.common.fspeed, "down_speed"), sort="down_speed", width=10),
+                Column("Up Speed", text=(deluge.common.fspeed, "up_speed"), sort="up_speed", width=10)]
 
 
 class PeerView(QtGui.QTreeView, component.Component):
@@ -78,31 +80,24 @@ class PeerView(QtGui.QTreeView, component.Component):
         QtGui.QTreeWidget.__init__(self, parent)
         component.Component.__init__(self, "PeerView", interval=2)
 
-        self.ui_config = configmanager.ConfigManager('qtui.conf')
-
         self.torrent_ids = []
 
         self.setModel(PeerViewModel(self))
+        self.model().resize_header(self.header())
 
         HeightFixItemDelegate.install(self)
         self.setItemDelegateForColumn(3, ProgressBarDelegate(self))
 
-        try:
-            self.header().restoreState(QtCore.QByteArray.fromBase64(self.ui_config['peer_view_state']))
-        except KeyError:
-            em = self.header().fontMetrics().width('M')
-            for i, column in enumerate(self.model().columns):
-                self.header().resizeSection(i, column.width * em)
-
     def stop(self):
         self.model().clear()
 
-    def shutdown(self):
-        self.ui_config['peer_view_state'] = self.header().saveState().toBase64().data()
+    def showEvent(self, event):
+        self.update()
+        super(FileView, self).showEvent(event)
 
     @defer.inlineCallbacks
     def update(self):
-        if self.torrent_ids:
+        if self.torrent_ids and self.isVisible():
             status = (yield component.get("SessionProxy").get_torrent_status(self.torrent_ids[0], ["peers"]))
             peers = dict((peer["ip"], peer) for peer in status["peers"])
             self.model().update(peers)

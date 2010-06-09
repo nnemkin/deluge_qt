@@ -29,10 +29,13 @@
 #    statement from all source files in the program, then also delete it here.
 #
 
+import cPickle as pickle
+
 from PyQt4 import QtGui, QtCore
 from twisted.internet import defer
 
 import deluge.common
+from deluge.log import LOG as log
 from deluge import component
 
 from .generated.ui import Ui_TorrentDetails
@@ -64,6 +67,7 @@ class TabProxy(QtCore.QObject):
                 if index != -1:
                     parent.removeTab(index)
             self.visible = visible
+            self.action.setChecked(visible)
 
 
 class LabelUpdater(object):
@@ -129,7 +133,7 @@ class TorrentDetails(QtGui.QTabWidget, Ui_TorrentDetails, component.Component):
 
         self.tab_proxies = [TabProxy(self, i) for i in xrange(self.count())]
         self.tabBar().setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
-        self.tabBar().addActions(self.get_tab_actions())
+        self.tabBar().addActions([tab.action for tab in self.tab_proxies])
 
         self.status = None
         self.torrent_ids = []
@@ -143,22 +147,15 @@ class TorrentDetails(QtGui.QTabWidget, Ui_TorrentDetails, component.Component):
             else:
                 self._clear()
 
-    def start(self):
-        pass
-
     def stop(self):
         self._clear()
-
-    def shutdown(self):
-        # Save the state of the tabs
-        pass
 
     @defer.inlineCallbacks
     def update(self):
         if self.torrent_ids:
             status = yield component.get("SessionProxy").get_torrent_status(self.torrent_ids[0], self.updater.fields())
 
-            if status != self.status:
+            if self.status != status:
                 for updater in self.updater.updaters:
                     updater(self, status)
                 self.status = status
@@ -170,5 +167,12 @@ class TorrentDetails(QtGui.QTabWidget, Ui_TorrentDetails, component.Component):
             if widget.objectName().startswith("status_"):
                 widget.setText("")
 
-    def get_tab_actions(self):
-        return [tab.action for tab in self.tab_proxies]
+    def saveState(self):
+        return QtCore.QByteArray(pickle.dumps([tab.visible for tab in self.tab_proxies], pickle.HIGHEST_PROTOCOL))
+
+    def restoreState(self, state):
+        try:
+            for i, visible in enumerate(pickle.loads(str(state))):
+                self.tab_proxies[i].setVisible(visible)
+        except Exception:
+            log.debug("Failed to restore tab state", exc_info=True)

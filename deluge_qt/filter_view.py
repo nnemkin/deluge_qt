@@ -29,6 +29,7 @@
 #    statement from all source files in the program, then also delete it here.
 #
 
+import sip
 from PyQt4 import QtGui, QtCore
 from twisted.internet import defer
 
@@ -36,7 +37,7 @@ from deluge import component, configmanager
 from deluge.ui.client import client
 
 from .ui_common import TrackerIconsCache
-from .ui_tools import HeightFixItemDelegate, IconLoader, treeContextMenuHandler
+from .ui_tools import HeightFixItemDelegate, IconLoader, context_menu_pos
 
 
 class FilterValueItem(QtGui.QTreeWidgetItem):
@@ -61,7 +62,10 @@ class FilterValueItem(QtGui.QTreeWidgetItem):
         if cat == "state" or value in ("All", "Error"):
             self.setIcon(0, self._state_icons.get(value, self._default_state_icon))
         elif cat == "tracker_host":
-            TrackerIconsCache(value).addCallback(lambda icon: self.setIcon(0, icon))
+            def set_self_icon(icon):
+                if not sip.isdeleted(icon):
+                    self.setIcon(0, icon)
+            TrackerIconsCache.get(value).addCallback(set_self_icon)
 
     def update(self, value, count):
         if self.count != count:
@@ -78,8 +82,8 @@ class FilterCategoryItem(QtGui.QTreeWidgetItem):
 
     _cat_names = {"state": "States", "tracker_host": "Trackers", "label": "Labels"}
 
-    _font = QtGui.QFont()
-    _font.setBold(True)
+    _bold_font = QtGui.QFont()
+    _bold_font.setBold(True)
 
     def __init__(self, cat, values):
         super(FilterCategoryItem, self).__init__()
@@ -88,7 +92,7 @@ class FilterCategoryItem(QtGui.QTreeWidgetItem):
         self.setText(0, _(self._cat_names.get(cat, cat)))
         # self.setBackground(0, QtGui.qApp.palette().alternateBase())
         self.setFlags(QtCore.Qt.ItemIsEnabled) # not selectable
-        self.setFont(0, self._font)
+        self.setFont(0, self._bold_font)
         self.update(values)
 
     def update(self, values):
@@ -157,14 +161,20 @@ class FilterView(QtGui.QTreeWidget, component.Component):
             self.setCurrentItem(self.topLevelItem(0).child(0));
 
     def contextMenuEvent(self, event):
-        treeContextMenuHandler(self, event, component.get("MainWindow").popup_menu_filters)
+        pos = context_menu_pos(self, event)
+        if pos:
+            component.get("MainWindow").popup_menu_filters.popup(pos)
 
     def selectionCommand(self, index, event):
-        # persist selection when category is clicked
         if isinstance(self.itemFromIndex(index), FilterCategoryItem):
+            # do not update selection when a category is clicked
             return QtGui.QItemSelectionModel.Current | QtGui.QItemSelectionModel.NoUpdate
         return super(FilterView, self).selectionCommand(index, event)
 
     def on_itemSelectionChanged(self):
-        if self.selectionModel().hasSelection():
-            self.filter_changed.emit(self.selectedItems()[0].filter_dict())
+        try:
+            item = self.selectedItems()[0]
+        except IndexError:
+            pass
+        else:
+            self.filter_changed.emit(item.filter_dict())

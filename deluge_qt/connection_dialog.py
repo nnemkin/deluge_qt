@@ -39,7 +39,7 @@ from deluge.ui.client import client, Client
 from deluge.log import LOG as log
 
 from .generated.ui import Ui_ConnectionDialog, Ui_AddHostDialog
-from .ui_tools import HeightFixItemDelegate, IconLoader
+from .ui_tools import HeightFixItemDelegate, IconLoader, WindowStateMixin
 import async_tools
 
 
@@ -49,7 +49,7 @@ class HostItem(QtGui.QTreeWidgetItem):
     _icon_alive = IconLoader.customIcon("gtk-yes.png")
     _icon_connected = IconLoader.customIcon("gtk-connect.png")
 
-    def __init__(self, (id, host, port, username, password)=(None, "localhost", 58846, "", "")):
+    def __init__(self, id=None, host="localhost", port=58846, username="", password=""):
         QtGui.QTreeWidgetItem.__init__(self)
         self.id = id or uuid.uuid1().hex
         self.host = host
@@ -99,7 +99,7 @@ class HostItem(QtGui.QTreeWidgetItem):
         return (self.id, self.host, self.port, self.username, self.password)
 
 
-class ConnectionDialog(QtGui.QDialog, Ui_ConnectionDialog):
+class ConnectionDialog(QtGui.QDialog, Ui_ConnectionDialog, WindowStateMixin):
 
     def __init__(self, parent=None):
         super(ConnectionDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
@@ -108,9 +108,6 @@ class ConnectionDialog(QtGui.QDialog, Ui_ConnectionDialog):
 
         self.ui_config = configmanager.ConfigManager("qtui.conf")
         self.host_config = configmanager.ConfigManager("hostlist.conf.1.2")
-
-        try: self.restoreGeometry(QtCore.QByteArray.fromBase64(self.ui_config["connection_dialog_geometry"]))
-        except KeyError: pass
 
         self.button_connect = QtGui.QPushButton(_("&Connect"), self, default=True, clicked=self.on_button_connect_clicked)
         self.button_disconnect = QtGui.QPushButton(_("&Disconnect"), self, clicked=self.on_button_disconnect_clicked)
@@ -123,7 +120,7 @@ class ConnectionDialog(QtGui.QDialog, Ui_ConnectionDialog):
 
         HeightFixItemDelegate.install(self.tree_hosts)
         self.tree_hosts.setHeaderLabels([_("Host"), _("Version")])
-        self.tree_hosts.addTopLevelItems(map(HostItem, self.host_config["hosts"]))
+        self.tree_hosts.addTopLevelItems([HostItem(*args) for args in self.host_config["hosts"]])
         self.tree_hosts.itemSelectionChanged.connect(self._update_buttons)
         self.tree_hosts.model().dataChanged.connect(self._update_buttons)
         header = self.tree_hosts.header()
@@ -136,6 +133,8 @@ class ConnectionDialog(QtGui.QDialog, Ui_ConnectionDialog):
         except StopIteration:
             if self.tree_hosts.topLevelItemCount():
                 self.tree_hosts.setCurrentItem(self.tree_hosts.topLevelItem(0))
+
+        WindowStateMixin.__init__(self, "connection_dialog")
 
     def hosts(self):
         return map(self.tree_hosts.topLevelItem, xrange(self.tree_hosts.topLevelItemCount()))
@@ -238,8 +237,8 @@ class ConnectionDialog(QtGui.QDialog, Ui_ConnectionDialog):
         self.ui_config["autoconnect"] = self.check_autoconnect.isChecked()
         self.ui_config["autostart_localhost"] = self.check_autostart.isChecked()
         self.ui_config["show_connection_manager_on_start"] = not self.check_do_not_show.isChecked()
-        self.ui_config["connection_dialog_geometry"] = self.saveGeometry().toBase64().data()
-        self.host_config["hosts"] = map(HostItem.config_tuple, self.hosts())
+        self.saveWindowState()
+        self.host_config["hosts"] = [host.config_tuple() for host in self.hosts()]
 
         super(ConnectionDialog, self).done(result)
 

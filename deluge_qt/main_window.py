@@ -37,34 +37,12 @@ from deluge import component, configmanager
 from deluge.ui.client import client
 
 from .generated.ui import Ui_MainWindow
-from ui_tools import IconLoader
+from ui_tools import IconLoader, WindowStateMixin
 
 
-class MainWindow(QtGui.QMainWindow, Ui_MainWindow, component.Component):
+class MainWindow(QtGui.QMainWindow, Ui_MainWindow, component.Component, WindowStateMixin):
 
     _pause_components = ["TorrentView", "TorrentDetails", "PeerView", "FileView", "StatusBar"]
-
-    '''
-    Dynamic and popup menus breakdown:
-        MainMenu has menu_view with 2 dynamic submenus:
-            * TorrentDetails' tab toggle
-            * TorrentView column toggle
-        FilterView uses static popup_menu_filter
-        TorrentView uses menu_torrent, borrowing it from main menu.
-            menu_torrent contains menu_torrent_options which contains 4 dynamic submenus:
-                * ul speed limit
-                * dl speed limit
-                * conn limit
-                * ul slots limit
-        FileView uses static popup_menu_file
-        TrayIcon uses popup_menu_tray with 2 dynamic submenus:
-            * ul speed limit
-            * dl speed limit
-        StatusBar uses the the following dynamic menus as popup menus:
-            * ul speed limit
-            * dl speed limit
-            * conn limit
-    '''
 
     def __init__(self):
         QtGui.QMainWindow.__init__(self)
@@ -75,15 +53,7 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow, component.Component):
         self.core_config = {}
 
         self.setupUi(self)
-        # restore widget states
-        try:
-            self.restoreGeometry(QtCore.QByteArray.fromBase64(self.ui_config["main_window_geometry"]))
-        except KeyError:
-            pass
-        try:
-            self.restoreState(QtCore.QByteArray.fromBase64(self.ui_config["main_window_state"]))
-        except KeyError:
-            pass
+        WindowStateMixin.__init__(self, "main_window")
 
         self.tree_filters.filter_changed.connect(self.tree_torrents.set_filter)
         self.tree_torrents.selection_changed.connect(self.set_torrent_ids)
@@ -115,8 +85,8 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow, component.Component):
         self.tray_icon.show()
 
         # dynamic menus
-        self.menu_columns.addActions(self.tree_torrents.get_column_actions())
-        self.menu_tabs.addActions(self.tabs_details.get_tab_actions())
+        self.menu_columns.addActions(self.tree_torrents.header().actions())
+        self.menu_tabs.addActions(self.tabs_details.tabBar().actions())
 
         # action setup (note: some connections are already done in designer)
         self.action_show_toolbar.setChecked(not self.toolbar.isHidden())
@@ -168,9 +138,7 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow, component.Component):
 
     def shutdown(self):
         self.tray_icon.hide()
-
-        self.ui_config["main_window_geometry"] = self.saveGeometry().toBase64().data()
-        self.ui_config["main_window_state"] = self.saveState().toBase64().data()
+        self.saveWindowState()
 
     @defer.inlineCallbacks
     def update(self):

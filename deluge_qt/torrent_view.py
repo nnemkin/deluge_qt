@@ -33,15 +33,15 @@ from PyQt4 import QtGui, QtCore
 from twisted.internet import defer
 
 import deluge.common
-from deluge import component, configmanager
+from deluge import component
 from deluge.ui.client import client
 
 import formats
-from .ui_tools import ProgressBarDelegate, HeightFixItemDelegate, IconLoader, header_view_actions, treeContextMenuHandler
-from .ui_common import TrackerIconsCache, ColumnModel
+from .ui_tools import ProgressBarDelegate, HeightFixItemDelegate, IconLoader, HeaderActionList, context_menu_pos, natsortkey
+from .ui_common import DictModel, Column, TrackerIconsCache
 
 
-class TorrentViewModel(ColumnModel):
+class TorrentViewModel(DictModel):
 
     _state_icons = {"Allocating": IconLoader.customIcon("checking16.png"),
                     "Checking": IconLoader.customIcon("checking16.png"),
@@ -50,6 +50,18 @@ class TorrentViewModel(ColumnModel):
                     "Paused": IconLoader.customIcon("inactive16.png"),
                     "Error": IconLoader.customIcon("alert16.png"),
                     "Queued": IconLoader.customIcon("queued16.png")}
+
+    def _refresh_trackers(self, result):
+        tracker_columns = self.columnsForFields(["tracker"])
+        self.dataChanged.emit(self.index(0, min(tracker_columns), len(self.order) - 1, max(tracker_columns)))
+
+    def _tracker_icon(self, host):
+        d = TrackerIconsCache.get(host)
+        try:
+            return d.result
+        except AttributeError:
+            d.addCallback(self._refresh_trackers)
+            return QtGui.QIcon()
 
     def _create_columns(self):
 
@@ -60,23 +72,23 @@ class TorrentViewModel(ColumnModel):
 
         def fargs(*args): return args
 
-        return [self.Column("#", text=(formats.fqueue, "queue"), sort="queue", width=4),
-                self.Column("Name", text="name", icon=(self._state_icons.get, "state"), sort="name", width=45),
-                self.Column("Size", text=(deluge.common.fsize, "total_wanted"), sort="total_wanted", width=8),
-                self.Column("Progress", text=(fprogress, "state", "progress"), user=(lambda p: p * 0.01, "progress"),
-                            sort=(fargs, "progress", "state"), width=18),
-                self.Column("Seeders", text=(deluge.common.fpeer, "num_seeds", "total_seeds"),
-                            sort=(fargs, "num_seeds", "total_seeds"), width=8),
-                self.Column("Peers", text=(deluge.common.fpeer, "num_peers", "total_peers"),
-                            sort=(fargs, "num_peers", "total_peers"), width=8),
-                self.Column("Down Speed", text=(formats.fspeed, "download_payload_rate"), sort="download_payload_rate", width=10),
-                self.Column("Up Speed", text=(formats.fspeed, "upload_payload_rate"), sort="upload_payload_rate", width=10),
-                self.Column("ETA", text=(deluge.common.ftime, "eta"), sort="eta", width=8),
-                self.Column("Ratio", text=(formats.fratio, "ratio"), sort="ratio", width=6),
-                self.Column("Avail", text=(formats.fratio, "distributed_copies"), sort="distributed_copies", width=6),
-                self.Column("Added", text=(deluge.common.fdate, "time_added"), sort="time_added", width=16),
-                self.Column("Tracker", text="tracker_host", icon=(TrackerIconsCache, "tracker_host"), sort="tracker_host", width=20),
-                self.Column("Save Path", text="save_path", sort="save_path", width=20)]
+        return [Column("#", text=(formats.fqueue, "queue"), sort="queue", width=4),
+                Column("Name", text="name", icon=(self._state_icons.get, "state"), sort=(natsortkey, "name"), width=45),
+                Column("Size", text=(deluge.common.fsize, "total_wanted"), sort="total_wanted", width=8),
+                Column("Progress", text=(fprogress, "state", "progress"), user=(lambda p: p * 0.01, "progress"),
+                       sort=(fargs, "progress", "state"), width=18),
+                Column("Seeders", text=(deluge.common.fpeer, "num_seeds", "total_seeds"),
+                       sort=(fargs, "num_seeds", "total_seeds"), width=8),
+                Column("Peers", text=(deluge.common.fpeer, "num_peers", "total_peers"),
+                       sort=(fargs, "num_peers", "total_peers"), width=8),
+                Column("Down Speed", text=(formats.fspeed, "download_payload_rate"), sort="download_payload_rate", width=10),
+                Column("Up Speed", text=(formats.fspeed, "upload_payload_rate"), sort="upload_payload_rate", width=10),
+                Column("ETA", text=(deluge.common.ftime, "eta"), sort="eta", width=8),
+                Column("Ratio", text=(formats.fratio, "ratio"), sort="ratio", width=6),
+                Column("Avail", text=(formats.fratio, "distributed_copies"), sort="distributed_copies", width=6),
+                Column("Added", text=(deluge.common.fdate, "time_added"), sort="time_added", width=16),
+                Column("Tracker", text="tracker_host", icon=(self._tracker_icon, "tracker_host"), sort="tracker_host", width=20),
+                Column("Save Path", text="save_path", sort="save_path", width=20)]
 
 
 class TorrentView(QtGui.QTreeView, component.Component):
@@ -87,12 +99,10 @@ class TorrentView(QtGui.QTreeView, component.Component):
         QtGui.QTreeWidget.__init__(self, parent)
         component.Component.__init__(self, "TorrentView", interval=2, depend=["SessionProxy"])
 
-        self.ui_config = configmanager.ConfigManager('qtui.conf')
-
         self.setModel(TorrentViewModel(self))
-
         self.setItemDelegateForColumn(3, ProgressBarDelegate(self))
         HeightFixItemDelegate.install(self)
+        self.model().resize_header(self.header())
 
         self.filter = {}
 
@@ -103,12 +113,7 @@ class TorrentView(QtGui.QTreeView, component.Component):
         client.register_event_handler("SessionPausedEvent", self.update)
         client.register_event_handler("SessionResumedEvent", self.update)
 
-        try:
-            self.header().restoreState(QtCore.QByteArray.fromBase64(self.ui_config['torrent_view_state']))
-        except KeyError:
-            em = self.header().fontMetrics().width('M')
-            for i, column in enumerate(self.model().columns):
-                self.header().resizeSection(i, column.width * em)
+        HeaderActionList(self)
 
     def selected_torrent_id(self):
         try:
@@ -117,25 +122,19 @@ class TorrentView(QtGui.QTreeView, component.Component):
             return None
 
     def selected_torrent_ids(self):
-        return self.model().ids_from_indices(self.selectedIndexes())
-
-    def get_column_actions(self):
-        return [] # TODO header_view_actions(self)
+        return [index.internalPointer() for index in self.selectedIndexes()]
 
     @defer.inlineCallbacks
     def start(self):
-        status = yield component.get("SessionProxy").get_torrents_status({}, self.model().fields())
+        status = yield component.get("SessionProxy").get_torrents_status({}, self.model().fieldsForColumns())
         self.model().update(status)
 
     def stop(self):
         self.model().clear()
 
-    def shutdown(self):
-        self.ui_config['torrent_view_state'] = self.header().saveState().toBase64().data()
-
     @defer.inlineCallbacks
     def update(self, unused=None):
-        status = yield component.get("SessionProxy").get_torrents_status(self.filter, self.model().fields(self.isColumnHidden))
+        status = yield component.get("SessionProxy").get_torrents_status(self.filter, self.model().fieldsForColumns(self.isColumnHidden))
         self.model().update(status)
 
     def selectionChanged(self, selected, deselected):
@@ -143,7 +142,9 @@ class TorrentView(QtGui.QTreeView, component.Component):
         self.selection_changed.emit(self.selected_torrent_ids())
 
     def contextMenuEvent(self, event):
-        treeContextMenuHandler(self, event, component.get("MainWindow").menu_torrent)
+        pos = context_menu_pos(self, event)
+        if pos:
+            component.get("MainWindow").menu_torrent.popup(pos)
 
     @QtCore.pyqtSlot(object)
     def set_filter(self, filter):

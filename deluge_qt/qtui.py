@@ -98,7 +98,7 @@ class QtUI(object):
         app.setWindowIcon(IconLoader.themeIcon('deluge'))
         ui_config.register_set_function("language", self.on_language_change, apply_now=True)
 
-        from deluge.ui.tracker_icons import TrackerIcons
+        from .tracker_icons import TrackerIcons
         from deluge.ui.sessionproxy import SessionProxy
         from .connection_manager import ConnectionManager
         from .main_window import MainWindow
