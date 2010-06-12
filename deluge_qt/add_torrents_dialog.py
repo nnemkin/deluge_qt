@@ -249,6 +249,13 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
 
         super(AddTorrentsDialog, self).accept()
 
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        self.add_torrents([url.toLocalFile() for url in event.mimeData().urls() if url.toLocalFile()])
+
 
 class UserCancelledError(Exception):
     pass

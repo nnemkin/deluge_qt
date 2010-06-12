@@ -289,6 +289,20 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow, component.Component, WindowSt
             else:
                 component.resume(self._pause_components)
 
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls() and client.connected():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        urls = [url.toLocalFile() for url in event.mimeData().urls() if url.toLocalFile()]
+        if urls:
+            from .add_torrents_dialog import AddTorrentsDialog
+            dialog = AddTorrentsDialog(self)
+            dialog.show()
+            dialog.activateWindow()
+            dialog.raise_()
+            dialog.add_torrents(urls)
+
 
 class ConfigActionList(QtGui.QActionGroup):
     """List of actions for upload/download speed and max connections menus."""
