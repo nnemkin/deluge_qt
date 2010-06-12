@@ -69,7 +69,8 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
 
         self.download_location_browse.setVisible(client.is_localhost())
 
-        self.tree_files.setModel(TorrentFileModel([], self.tree_files))
+        self.EMPTY_FILE_MODEL = TorrentFileModel([], self)
+        self.tree_files.setModel(self.EMPTY_FILE_MODEL)
         header = self.tree_files.header()
         header.setStretchLastSection(False)
         header.setMinimumSectionSize(header.fontMetrics().width("M") * 10)
@@ -86,7 +87,7 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
         self.default_options = dict((self._core_keys_to_torrent_keys[k], v) for k, v in core_config.items())
 
     def torrents(self):
-        return map(self.list_torrents.item, range(self.list_torrents.count()))
+        return [self.list_torrents.item(i) for i in xrange(self.list_torrents.count())]
 
     @defer.inlineCallbacks
     def add_url(self, url):
@@ -228,7 +229,7 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
             self._selected_item = self.list_torrents.selectedItems()[0]
         except IndexError:
             self._selected_item = None
-            self.tree_files.clear()
+            self.tree_files.setModel(self.EMPTY_FILE_MODEL)
         else:
             self._load_options(self._selected_item)
 
