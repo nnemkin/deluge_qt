@@ -93,7 +93,7 @@ class PeerView(QtGui.QTreeView, component.Component):
 
     def showEvent(self, event):
         self.update()
-        super(FileView, self).showEvent(event)
+        super(PeerView, self).showEvent(event)
 
     @defer.inlineCallbacks
     def update(self):
