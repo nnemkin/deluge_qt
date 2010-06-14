@@ -16,6 +16,7 @@ def postprocess_text(text):
 
     # (Required) pyuic4 fails when non-translatable text property contains unicode text. We make three such field "non-translatable" here.
     text = re.sub(r'(?s)(self.text_(authors|translators|artists).setPlainText)\(_\((".+?")\)\)\n', r'\1(u\3)\n', text)
+    text = re.sub(r'("(?:\\"|[^"])*[\x80-\xff](?:\\"|[^"])*")', r'u\1', text)
 
     # (Optional) Remove unnecessary "setObjectName"s.
     text = re.sub(r'(?i)\n *(\w+\.)+setObjectName\("([a-z\d]+_\d+|(horizontal|vertical|form|grid)Layout)"\)', '', text)
