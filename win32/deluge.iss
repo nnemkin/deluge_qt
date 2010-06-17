@@ -66,11 +66,11 @@ Name: urlassoc; Description: {cm:AssocUrlHandler,Deluge,magnet:}
 [Icons]
 Name: {group}\Deluge; Filename: {app}\deluge.exe; IconFilename: {app}\deluge.exe
 Name: {group}\Deluge Daemon; Filename: {app}\deluged.exe; IconFilename: {app}\deluged.exe
-Name: {group}\Deluge Console; Filename: {app}\deluge-console.exe; IconFilename: {app}\deluge-console.exe
-Name: {group}\Deluge Web; Filename: {app}\deluge-web.exe; IconFilename: {app}\deluge-web.exe
+Name: {group}\Deluge Console; Filename: {app}\deluge-consoleui.exe; IconFilename: {app}\deluge-consoleui.exe
+Name: {group}\Deluge Web; Filename: {app}\deluge-webui.exe; IconFilename: {app}\deluge-webui.exe
 Name: {group}\Uninstall Deluge; Filename: {uninstallexe}
-Name: {userappdata}\Microsoft\Internet Explorer\Quick Launch\Deluge; Filename: {app}\Deluge.exe; Tasks: quicklaunchicon
-Name: {userdesktop}\Deluge; Filename: {app}\Deluge.exe; Tasks: desktopicon
+Name: {userappdata}\Microsoft\Internet Explorer\Quick Launch\Deluge; Filename: {app}\deluge.exe; Tasks: quicklaunchicon
+Name: {userdesktop}\Deluge; Filename: {app}\deluge.exe; Tasks: desktopicon
 
 [Registry]
 Root: HKCR; Subkey: {#AppName}; ValueType: string; ValueData: Deluge Bittorrent Client; Flags: uninsdeletekey
@@ -130,7 +130,7 @@ begin
 		Result := false;
 		ExtractTemporaryFile('IssProcLanguage.ini');
 		hWnd := StrToInt(ExpandConstant('{wizardhwnd}'));
-		sModuleName := ExpandConstant('*deluge.exe;*deluged.exe;*deluge-web.exe;*deluge-console.exe;'); { searched modules. Tip: separate multiple modules with semicolon Ex: '*mymodule.dll;*mymodule2.dll;*myapp.exe'}
+		sModuleName := ExpandConstant('*deluge.exe;*deluged.exe;*deluge-webui.exe;*deluge-consoleui.exe;'); { searched modules. Tip: separate multiple modules with semicolon Ex: '*mymodule.dll;*mymodule2.dll;*myapp.exe'}
 
 		{ search for module and display files-in-use window if found  }
 		nCode := IssFindModule(hWnd, sModuleName, ExpandConstant('{language}'), false, true);
@@ -155,7 +155,7 @@ var
 
 begin
     Result := false;
-    sModuleName := ExpandConstant('*deluge.exe;*deluged.exe;*deluge-web.exe;*deluge-console.exe;');
+    sModuleName := ExpandConstant('*deluge.exe;*deluged.exe;*deluge-webui.exe;*deluge-consoleui.exe;');
 
     nCode := IssFindModuleU(0, sModuleName, ExpandConstant('{language}'), false, false);
 
