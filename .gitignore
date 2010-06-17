@@ -1,9 +1,11 @@
 *.pyc
+*.pyo
+*.egg-info
 build
 dist
-*.egg-info
-*.egg
-*.log
-*.tar.*
 deluge_qt/generated
 deluge_qt/data/resources.qrc
+win32/build
+win32/dist
+win32/installer
+win32/files/vcredist_x86.exe 

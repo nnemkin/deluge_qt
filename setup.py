@@ -21,4 +21,5 @@ setup(name="deluge-qt",
                                   "data/icons/deluge/*/*/*"]},
       install_requires=["deluge", "twisted"],
       zip_safe=True,
-      entry_points={"gui_scripts": ["deluge-qt = deluge_qt.qtui:start"], "deluge.ui": ["qt = deluge_qt.qtui.QtUI"]})
+      entry_points={"gui_scripts": ["deluge-qt = deluge_qt.qtui:start"],
+                    "deluge.ui": ["qt = deluge_qt.qtui.QtUI"]})
