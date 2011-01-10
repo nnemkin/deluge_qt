@@ -50,8 +50,6 @@ from .ui_common import DictModel, Column
 class PeerViewModel(DictModel):
 
     def _create_columns(self):
-        peer_seed_icon = (IconLoader.customIcon("downloading16.png"), IconLoader.customIcon("seeding16.png"))
-
         @memoize
         def flag_icon(country):
             try:
@@ -65,8 +63,11 @@ class PeerViewModel(DictModel):
             addr = inet_pton(socket.AF_INET6 if ':' in addr else socket.AF_INET, addr)
             return (addr, port)
 
+        peer_icon = IconLoader.customIcon("downloading16.png")
+        seed_icon = IconLoader.customIcon("seeding16.png")
+
         return [Column("", icon=(flag_icon, "country"), toolTip=(COUNTRIES.get, "country"), sort="country", width=3),
-                Column("Address", text="ip", icon=(lambda flag: peer_seed_icon[bool(flag)], "seed"),
+                Column("Address", text="ip", icon=(lambda flag: seed_icon if flag else peer_icon, "seed"),
                        sort=(ip_sort_key, "total_wanted"), width=20),
                 Column("Client", text="client", sort="client", width=15),
                 Column("Progress", text=(deluge.common.fpcnt, "progress"), user="progress", sort="progress", width=15),

@@ -137,7 +137,7 @@ class QtUITranslations(gettext.GNUTranslations):
         try:
             return self._catalog.get(message, u"") # hack
         except AttributeError:
-            translated = gettext.GNUTranslations.ugettext(self, message) # NB: GNUTranslations is old-style class 
+            translated = gettext.GNUTranslations.ugettext(self, message) # NB: GNUTranslations is an old-style class 
             return translated if translated != message else u""
 
     def ugettext(self, message):
