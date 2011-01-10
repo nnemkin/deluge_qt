@@ -1,12 +1,11 @@
 
 import sys
-import StringIO
 from lxml import etree
 
 
 def fix_tab_order(filename):
-	with open('fix_tab_order.xslt', 'rb') as xslt_file:
-    	xslt_doc = etree.parse(xslt_file)
+    with open('fix_tab_order.xslt', 'rb') as xslt_file:
+        xslt_doc = etree.parse(xslt_file)
 
     with open(filename, 'rb') as f:
         xml_doc = etree.parse(f)
