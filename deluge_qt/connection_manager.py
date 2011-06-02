@@ -42,7 +42,7 @@ from deluge.log import LOG as log
 class ConnectionManager(component.Component):
     """Used by startup code and connection dialog."""
 
-    default_host_config = {"hosts": [(uuid.uuid1().hex, "localhost", 58846, "", "")]}
+    default_host_config = {"hosts": [(uuid.uuid1().hex, "127.0.0.1", 58846, "", "")]}
 
     def __init__(self):
         super(ConnectionManager, self).__init__("ConnectionManager")
@@ -68,7 +68,7 @@ class ConnectionManager(component.Component):
             mb.setDefaultButton(QtGui.QMessageBox.No)
             if isinstance(e, DaemonRunningError):
                 mb.setWindowTitle(_("Turn off Classic Mode?"))
-                mb.setText(_("It appears that a Deluge daemon process (deluged) is already running.\n\n\You will either need to stop the daemon or turn off Classic Mode to continue."))
+                mb.setText(_("It appears that a Deluge daemon process (deluged) is already running.\n\nYou will either need to stop the daemon or turn off Classic Mode to continue."))
                 mb.setIcon(QtGui.QMessageBox.Question)
             else:
                 mb.setWindowTitle(_("Error Starting Core"))
@@ -86,8 +86,9 @@ class ConnectionManager(component.Component):
             component.start()
 
     def _start_thin(self):
+        host_config = configmanager.ConfigManager("hostlist.conf.1.2", self.default_host_config)
+
         if self.ui_config["autoconnect"]:
-            host_config = configmanager.ConfigManager("hostlist.conf.1.2", self.default_host_config)
             for host in host_config["hosts"]:
                 if host[0] == self.ui_config["autoconnect_host_id"]:
                     self.connect(host, autostart=self.ui_config["autostart_localhost"])
