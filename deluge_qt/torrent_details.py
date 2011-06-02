@@ -34,12 +34,11 @@ import cPickle as pickle
 from PyQt4 import QtGui, QtCore
 from twisted.internet import defer
 
-import deluge.common
 from deluge.log import LOG as log
 from deluge import component
 
-from .generated.ui import Ui_TorrentDetails
 import formats
+from .generated.ui import Ui_TorrentDetails
 
 
 class TabProxy(QtCore.QObject):
@@ -70,58 +69,7 @@ class TabProxy(QtCore.QObject):
             self.action.setChecked(visible)
 
 
-class LabelUpdater(object):
-
-    def __init__(self):
-        self.updaters = []
-        self._fields = set()
-
-    def add(self, name, **kwargs):
-        for role, args in kwargs.items():
-            setter = { 'text': 'setText', 'value': 'setValue' }[role]
-            if isinstance(args, tuple):
-                func, fields = args[0], args[1:]
-                def updater(widget, status): getattr(getattr(widget, name), setter)(func(*(status[field] for field in fields)))
-                self._fields.update(fields)
-            else:
-                def updater(widget, status): getattr(getattr(widget, name), setter)(status[args])
-                self._fields.add(args)
-            self.updaters.append(updater)
-
-    def fields(self):
-        return list(self._fields)
-
-
 class TorrentDetails(QtGui.QTabWidget, Ui_TorrentDetails, component.Component):
-
-    updater = LabelUpdater()
-    updater.add("status_pieces", text=(formats.fpieces, "num_pieces", "piece_length"))
-    updater.add("status_availability", text=(formats.fratio, "distributed_copies"))
-    updater.add("status_total_downloaded", text=(formats.fsize2, "all_time_download", "total_payload_download"))
-    updater.add("status_total_uploaded", text=(formats.fsize2, "total_uploaded", "total_payload_upload"))
-    updater.add("status_download_speed", text=(formats.fspeed, "download_payload_rate", "max_download_speed"))
-    updater.add("status_upload_speed", text=(formats.fspeed, "upload_payload_rate", "max_upload_speed"))
-    updater.add("status_seeders", text=(deluge.common.fpeer, "num_seeds", "total_seeds"))
-    updater.add("status_peers", text=(deluge.common.fpeer, "num_peers", "total_peers"))
-    updater.add("status_eta", text=(deluge.common.ftime, "eta"))
-    updater.add("status_share_ratio", text=(formats.fratio, "ratio"))
-    updater.add("status_tracker_status", text="tracker_status")
-    updater.add("status_next_announce", text=(deluge.common.ftime, "next_announce"))
-    updater.add("status_active_time", text=(deluge.common.ftime, "active_time"))
-    updater.add("status_seed_time", text=(deluge.common.ftime, "seeding_time"))
-    updater.add("status_seed_rank", text=(str, "seed_rank"))
-    updater.add("status_auto_managed", text=(str, "is_auto_managed"))
-    updater.add("status_date_added", text=(deluge.common.fdate, "time_added"))
-    updater.add("status_name", text="name")
-    updater.add("status_total_size", text=(deluge.common.fsize, "total_size"))
-    updater.add("status_num_files", text=(str, "num_files"))
-    updater.add("status_tracker", text="tracker")
-    updater.add("status_torrent_path", text="save_path")
-    updater.add("status_message", text="message")
-    updater.add("status_hash", text="hash")
-    updater.add("status_comments", text="comment")
-    updater.add("progress_bar", text=(lambda p: deluge.common.fpcnt(p * 0.01), "progress"))
-    updater.add("progress_bar", value=(lambda p: int(p * 10), "progress"))
 
     def __init__(self, parent=None):
         QtGui.QTabWidget.__init__(self, parent)
@@ -134,6 +82,37 @@ class TorrentDetails(QtGui.QTabWidget, Ui_TorrentDetails, component.Component):
         self.tab_proxies = [TabProxy(self, i) for i in xrange(self.count())]
         self.tabBar().setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
         self.tabBar().addActions([tab.action for tab in self.tab_proxies])
+
+        self.bindings = [
+            (self.status_pieces, formats.fpieces, "num_pieces", "piece_length"),
+            (self.status_availability, formats.fratio, "distributed_copies"),
+            (self.status_total_downloaded, formats.fsize2, "all_time_download", "total_payload_download"),
+            (self.status_total_uploaded, formats.fsize2, "total_uploaded", "total_payload_upload"),
+            (self.status_download_speed, formats.fspeed, "download_payload_rate", "max_download_speed"),
+            (self.status_upload_speed, formats.fspeed, "upload_payload_rate", "max_upload_speed"),
+            (self.status_seeders, formats.fpeer, "num_seeds", "total_seeds"),
+            (self.status_peers, formats.fpeer, "num_peers", "total_peers"),
+            (self.status_eta, formats.ftime, "eta"),
+            (self.status_share_ratio, formats.fratio, "ratio"),
+            (self.status_tracker_status, str, "tracker_status"),
+            (self.status_next_announce, formats.ftime, "next_announce"),
+            (self.status_active_time, formats.ftime, "active_time"),
+            (self.status_seed_time, formats.ftime, "seeding_time"),
+            (self.status_seed_rank, str, "seed_rank"),
+            (self.status_auto_managed, str, "is_auto_managed"),
+            (self.status_date_added, formats.fdate, "time_added"),
+            (self.status_name, str, "name"),
+            (self.status_total_size, formats.fsize, "total_size"),
+            (self.status_num_files, str, "num_files"),
+            (self.status_tracker, str, "tracker"),
+            (self.status_torrent_path, str, "save_path"),
+            (self.status_message, str, "message"),
+            (self.status_hash, str, "hash"),
+            (self.status_comments, str, "comment")]
+
+        self.fields = set(("progress",))
+        for binding in self.bindings:
+            self.fields.update(binding[2:])
 
         self.status = None
         self.torrent_ids = []
@@ -153,12 +132,19 @@ class TorrentDetails(QtGui.QTabWidget, Ui_TorrentDetails, component.Component):
     @defer.inlineCallbacks
     def update(self):
         if self.torrent_ids:
-            status = yield component.get("SessionProxy").get_torrent_status(self.torrent_ids[0], self.updater.fields())
+            status = yield component.get("SessionProxy").get_torrent_status(self.torrent_ids[0], self.fields)
 
-            if self.status != status:
-                for updater in self.updater.updaters:
-                    updater(self, status)
-                self.status = status
+            if self.status == status:
+                return
+
+            for binding in self.bindings:
+                label, func, args = binding[0], binding[1], binding[2:] 
+                label.setText(func(*(status[arg] for arg in args)))
+
+            self.progress_bar.setText(formats.fpcnt(status["progress"] * 0.01))
+            self.progress_bar.setValue(int(status["progress"] * 10))
+
+            self.status = status
 
     def _clear(self):
         self.progress_bar.setValue(0)

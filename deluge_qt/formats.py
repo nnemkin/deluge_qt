@@ -29,7 +29,7 @@
 #    statement from all source files in the program, then also delete it here.
 #
 
-import deluge.common
+from deluge.common import fsize, fpcnt, fspeed as _fspeed1, fpeer, ftime, fdate
 
 
 def fqueue(queue):
@@ -41,15 +41,15 @@ def fratio(ratio):
     return "%.3f" % ratio
 
 def fspeed(speed, limit_kib= -1):
-    speed = deluge.common.fspeed(speed)
+    speed = _fspeed1(speed)
     if limit_kib > -1:
         return "%s (%s %s)" % (speed, limit_kib, _("KiB/s"))
     return speed
 
 def fsize2(size, second_size=None):
     if second_size:
-        return "%s (%s)" % (deluge.common.fsize(size), deluge.common.fsize(second_size))
-    return deluge.common.fsize(size)
+        return "%s (%s)" % (fsize(size), fsize(second_size))
+    return fsize(size)
 
 def fpieces(pieces, length):
-    return "%s (%s)" % (pieces, deluge.common.fsize(length))
+    return "%s (%s)" % (pieces, fsize(length))
