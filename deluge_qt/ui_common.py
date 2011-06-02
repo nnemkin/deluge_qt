@@ -30,6 +30,7 @@
 #
 
 import operator
+import posixpath
 
 from PyQt4 import QtCore, QtGui
 
@@ -91,7 +92,7 @@ class BaseModel(QtCore.QAbstractItemModel):
     def _create_columns(self):
         raise NotImplementedError
 
-    def _sort(self):
+    def _sort(self, column, reverse):
         raise NotImplementedError
 
     def _clear(self):
@@ -224,10 +225,9 @@ class DictModel(BaseModel):
 class FileModel(BaseModel):
     """Model for torrent files list."""
 
-    NAME_SEP = "/"
-
     filesRenamed = QtCore.pyqtSignal(object)
     folderRenamed = QtCore.pyqtSignal(str, str)
+    indexesAdded = QtCore.pyqtSignal(object)
 
     class Item(object):
 
@@ -269,13 +269,21 @@ class FileModel(BaseModel):
             for child in self.children:
                 child.sort(**kwargs)
 
+        def validate(self):
+            if self.parent:
+                assert self.name
+            for child in self.children:
+                assert child.parent == self
+                child.validate()
 
-    def __init__(self, parent):
+    def __init__(self, parent, path=posixpath):
         super(FileModel, self).__init__(parent)
+        self.path = path
 
     def _create_columns(self):
-        icon_file_folder = (IconLoader.themeIcon("text-x-generic"), IconLoader.themeIcon("folder"))
-        ficon = lambda index: icon_file_folder[index is None]
+        icon_file = IconLoader.themeIcon("text-x-generic")
+        icon_folder = IconLoader.themeIcon("folder")
+        ficon = lambda index: icon_folder if index is None else icon_file
 
         return [Column('Filename', text="name", icon=(ficon, "index"), edit="name", sort=(natsortkey, "name"), width=45),
                 Column('Size', text=(deluge.common.fsize, "size"), sort="size", width=10)]
@@ -321,21 +329,19 @@ class FileModel(BaseModel):
             return
 
         self.clear()
-        level = 0
-        parent = self.root
-        prev_names = []
-        i = 0
-        for file in sorted(files, key=operator.itemgetter("path")):
-            names = file["path"].split(self.NAME_SEP)
-            while names[:level] != prev_names[:level]: # XXX
-                parent = parent.parent # ascend
-                level -= 1
-            while len(names) - 1 > level:
-                parent = self.Item(parent, names[level]) # descend
-                level += 1
-            self.file_items.append(self.Item(parent, names[-1], self, i))
-            i += 1
-            prev_names = names
+
+        items = {"": self.root}
+        def _item(path):
+            try:
+                return items[path]
+            except KeyError:
+                parent_path, name = self.path.split(path)
+                items[path] = new_item = self.Item(_item(parent_path), name)
+                return new_item
+
+        for i, file in enumerate(files):
+            path, name = self.path.split(file["path"])
+            self.file_items.append(self.Item(_item(path), name, self, i))
 
         self.files = files
 
@@ -350,11 +356,27 @@ class FileModel(BaseModel):
 
     def setData(self, index, value, role):
         item = index.internalPointer()
-        if item and index.column() == 0 and role == QtCore.Qt.EditRole:
+        if item and index.column() == 0 and role == QtCore.Qt.EditRole and item.name != value:
             if item.is_file():
-                self.filesRenamed.emit([(item.index, value)])
+                old_path = self.files[item.index]["path"]
+                new_path = self.path.join(self.path.dirname(old_path), value)
+                print 'FILE "%s" -> "%s"' % (old_path, new_path)
+                self.filesRenamed.emit([(item.index, new_path)])
             else:
-                self.folderRenamed.emit(item.path(), value)
+                parts = []
+                while item.name:
+                    parts.append(item.name)
+                    item = item.parent
+                if parts:
+                    parts.reverse()
+                    old_path = self.path.join(*parts) + self.path.sep
+                    parts[-1] = value
+                    new_path = self.path.join(*parts) + self.path.sep
+                else:
+                    old_path = ""
+                    new_path = value
+                print 'DIR "%s" -> "%s"' % (old_path, new_path)
+                self.folderRenamed.emit(old_path, new_path)
             return True
         return False
 
@@ -371,6 +393,96 @@ class FileModel(BaseModel):
                 new_indexes.append(self.createIndex(row, index.column(), item))
         if new_indexes:
             self.changePersistentIndexList(old_indexes, new_indexes)
+
+    def _findItem(self, path):
+        parent = self.root
+        new_items = []
+        for part in path.split("/"):
+            if not part:
+                continue
+            for child in parent.children:
+                if child.name == part:
+                    parent = child
+                    break
+            else:
+                new_item = self.Item(parent, part)
+                new_items.append(new_item)
+                parent.children.sort(**self.sort_args)
+                parent = new_item
+        return parent, new_items
+
+    def _reparentItems(self, items, new_parent):
+        self.layoutAboutToBeChanged.emit()
+        for item in items:
+            parent = item.parent
+            parent.children.remove(item)
+            item.parent = new_parent
+            new_parent.children.append(item)
+            self.root.validate()
+            while parent and not parent.children: # kill empty folders
+                next_parent = parent.parent
+                next_parent.children.remove(parent)
+                parent.invalidate()
+                parent = next_parent
+                self.root.validate()
+
+        new_parent.children.sort(**self.sort_args)
+        self._updatePersistentIndexes()
+        self.layoutChanged.emit()
+
+    def _renameItem(self, item, path):
+        parent_path, name = self.path.split(path.rstrip(self.path.sep))
+        new_parent, new_items = self._findItem(parent_path)
+
+        item.name = name
+        if item.parent != new_parent:
+            self._reparentItems([item], new_parent)
+            if new_items:
+                self.indexesAdded.emit([self.createIndex(item.row(), 0, item) for item in new_items])
+        else:
+            index = self.createIndex(item.row(), 0, item)
+            self.dataChanged.emit(index, index)
+
+        self.root.validate()
+
+    def renameFile(self, index, path):
+        self.files[index]["path"] = path
+        self._renameItem(self.file_items[index], path)
+
+    def renameFolder(self, old_name, new_name):
+        for i, file in enumerate(self.files):
+            if file["path"].startswith(old_name):
+                file["path"] = file["path"].replace(old_name, new_name, 1)
+                item = self.file_items[i].parent
+        self._renameItem(item, new_name)
+
+    class ItemMimeData(QtCore.QMimeData):
+
+        def __init__(self, items):
+            super(FileModel.ItemMimeData, self).__init__()
+            self.items = items
+
+    def supportedDropActions(self):
+        return QtCore.Qt.MoveAction
+
+    def mimeTypes(self):
+        return ["application/x-deluge-item-list"]
+
+    def mimeData(self, indexes):
+        items = [index.internalPointer() for index in indexes]
+        parents = set()
+        for item in items:
+            parent = item.parent
+            while parent and parent not in parents:
+                parents.add(parent)
+                parent = parent.parent
+        if not parents.intersection(items): # we can't move items and their parents at the same time
+            return self.ItemMimeData(items)
+
+    def dropMimeData(self, data, action, row, column, parent):
+        if action != QtCore.Qt.IgnoreAction and isinstance(data, self.ItemMimeData):
+            items = [item for item in data.items if item.parent is not None]
+            self._reparentItems(items, parent.internalIndex() or self.root)
 
 
 class WidgetLoader(object):

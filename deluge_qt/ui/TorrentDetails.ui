@@ -693,8 +693,14 @@
     </property>
     <item>
      <widget class="FileView" name="tree_files">
+      <property name="acceptDrops">
+       <bool>true</bool>
+      </property>
       <property name="dragEnabled">
        <bool>true</bool>
+      </property>
+      <property name="dragDropMode">
+       <enum>QAbstractItemView::InternalMove</enum>
       </property>
       <property name="selectionMode">
        <enum>QAbstractItemView::ExtendedSelection</enum>
@@ -708,9 +714,6 @@
       <property name="allColumnsShowFocus">
        <bool>true</bool>
       </property>
-      <attribute name="headerStretchLastSection">
-       <bool>false</bool>
-      </attribute>
       <attribute name="headerStretchLastSection">
        <bool>false</bool>
       </attribute>

@@ -140,6 +140,7 @@ class FileView(QtGui.QTreeView, component.Component):
                 self.file_models[self.torrent_ids[0]] = model = FileViewModel(status["files"], self)
                 model.filesRenamed.connect(self.on_model_filesRenamed)
                 model.folderRenamed.connect(self.on_model_folderRenamed)
+                model.indexesAdded.connect(self.on_model_indexesAdded)
                 self.setModel(model)
                 self.expandToDepth(0)
 
@@ -158,20 +159,33 @@ class FileView(QtGui.QTreeView, component.Component):
     def on_model_folderRenamed(self, old_name, new_name):
         client.core.rename_folder(self.torrent_ids[0], old_name, new_name)
 
+    @QtCore.pyqtSlot(object)
+    def on_model_indexesAdded(self, indexes):
+        current_index = self.currentIndex()
+        for index in indexes:
+            self.expand(index)
+        if not self.selectionModel().isSelected(current_index):
+            self.setCurrentIndex(current_index)
+            self.scrollTo(current_index)
+
     def on_client_torrentFileRenamed(self, torrent_id, index, name):
         try:
-            self.file_models[torrent_id].renameFile(index, name)
+            model = self.file_models[torrent_id]
         except KeyError:
             pass
+        else:
+            model.renameFile(index, name)
 
     def on_client_torrentFolderRenamed(self, torrent_id, old_name, new_name):
         try:
-            self.file_models[torrent_id].renameFonler(old_name, new_name)
+            model = self.file_models[torrent_id]
         except KeyError:
             pass
+        else:
+            model.renameFolder(old_name, new_name)
 
     def on_client_torrentRemoved(self, torrent_id):
-        self.file_models.pop(torrent_id)
+        self.file_models.pop(torrent_id, None)
 
     @QtCore.pyqtSlot(object)
     def set_torrent_ids(self, torrent_ids):
