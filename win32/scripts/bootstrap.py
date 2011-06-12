@@ -1,107 +1,74 @@
 
 import sys
 
+
 def _bootstrap_common():
-    # prevent linecache (used in tracebacks) from accessing nonexistent files
+    # prevent linecache (used in tracebacks) from accessing nonexistent source files
 
     import linecache
-    linecache.getline = lambda filename, lineno, module_globals = None: ""
+
+    def getline(filename, lineno, module_globals = None):
+        return ""
+
+    linecache.getline = getline
 
 
 def _bootstrap_io():
+    # Ignore output to stdout and stderr, log unhandled exceptions.
 
-    import atexit
+    import io
+    import logging
 
-    # log stderr to appname.exe.log
+    class NullWriter(io.TextIOBase):
 
-    class StdErr(object):
+        def write(self, text):
+            pass
 
-        def __init__(self):
-            self._file = None
-            self._error = None
+    def excepthook(*exc_info):
+        logging.error(exc_info[1], exc_info=exc_info)
 
-        def write(self, text, alert=sys._MessageBox, fname=sys.executable + '.log'):
-            if self._file is None and self._error is None:
-                try:
-                    self._file = open(fname, 'wb')
-                except Exception, e:
-                    self._error = e
-                    atexit.register(alert, 0, "The logfile '%s' could not be opened:\n %s" % (fname, e), "Errors occurred")
-                else:
-                    atexit.register(alert, 0, "See the logfile '%s' for details" % fname, "Errors occurred")
-
-            if self._file is not None:
-                self._file.write(text)
-                self._file.flush()
-
-        def flush(self):
-            if self._file is not None:
-                self._file.flush()
-
-    sys.stderr = StdErr()
-
-    # ignore stdout
-
-    class Blackhole(object):
-
-        def write(self, text): pass
-        def flush(self): pass
-
-    sys.stdout = Blackhole()
+    sys.excepthook = excepthook
+    sys.stdout = sys.stderr = NullWriter()
 
 
 def _bootstrap_eggs():
+    # Install customized resource provider and distribution finder so that pkg_resources
+    # can work with py2exe packaged application.
 
     import pkg_resources
     import cPickle as pickle
     import zipimport
     import os.path
 
-    # make pkg_resources happy
-
     class InstalledProvider(pkg_resources.DefaultProvider):
+        # Make resource paths for all packages to be relative to executable
 
-        def __init__(self, name):
+        def __init__(self, module):
             self.module_path = os.path.dirname(sys.executable)
 
 
-    class StringMetadata(InstalledProvider):
+    class StringMetadata(pkg_resources.EmptyProvider):
 
         def __init__(self, metadata):
-            self.metadata = metadata
+            self._metadata = metadata
 
         def has_metadata(self, name):
-            return name == "PKG-INFO"
+            return name in self._metadata
 
         def get_metadata(self, name):
-            if name == "PKG-INFO":
-                return self.metadata
-            raise KeyError
-
-#        def has_metadata(self, name):
-#            return name.lstrip("/") in self.metadata
-#
-#        def metadata_isdir(self, name):
-#            return self.metadata[name.lstrip("/")]["is_dir"]
-#
-#        def metadata_listdir(self, name):
-#            return self.metadata[name.lstrip("/")]["listing"]
-#
-#        def get_metadata(self, name):
-#            return self.metadata[name.lstrip("/")]["contents"]
-
-        def get_metadata_lines(self, name):
-            return pkg_resources.yield_lines(self.get_metadata(name))
+            return self._metadata[name]
 
 
     def installed_finder(importer, path_item, only=False):
+        # with py2exe we will ever have one path_item (library.zip) that contains all distributions
         try:
             packages = pickle.loads(importer.get_data("packages.pickle"))
         except IOError:
-            pkg_resources.find_in_zip(path_item, only) # XXX: private function
+            pass  # file not found
         else:
             for egg_name, metadata in packages.iteritems():
-                yield pkg_resources.Distribution.from_location(path_item, egg_name, metadata=StringMetadata(metadata))
+                yield pkg_resources.Distribution.from_location(
+                    path_item, egg_name, metadata=StringMetadata(metadata))
 
 
     pkg_resources.register_finder(zipimport.zipimporter, installed_finder)
@@ -109,6 +76,6 @@ def _bootstrap_eggs():
 
 
 _bootstrap_common()
-if sys.frozen == "windows_exe":
+if sys.frozen == "windows_exe":  # Win32 GUI application
     _bootstrap_io()
 _bootstrap_eggs()
