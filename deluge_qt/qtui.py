@@ -79,24 +79,23 @@ class QtUI(object):
     }
 
     def __init__(self, args):
-        from deluge import configmanager, component
+        from deluge import configmanager
 
-        ui_config = configmanager.ConfigManager("qtui.conf", self.default_ui_config)
+        self.ui_config = configmanager.ConfigManager("qtui.conf", self.default_ui_config)
 
-#        if ui_config["style"] and '-style' not in args:
-#            QtGui.QApplication.setStyle(ui_config["style"])
+#        if self.ui_config["style"] and '-style' not in args:
+#            QtGui.QApplication.setStyle(self.ui_config["style"])
         app = QtGui.QApplication(args, applicationName="Deluge", quitOnLastWindowClosed=False)
 
         import qt4reactor
         qt4reactor.install()
         from twisted.internet import reactor
-        reactor.runReturn(installSignalHandlers=False)
 
         self.locale_dir = pkg_resources.resource_filename("deluge", "i18n")
 
         from ui_tools import IconLoader
-        app.setWindowIcon(IconLoader.themeIcon('deluge'))
-        ui_config.register_set_function("language", self.on_language_change, apply_now=True)
+        app.setWindowIcon(IconLoader.themeIcon("deluge"))
+        self.ui_config.register_set_function("language", self.on_language_change, apply_now=True)
 
         from .tracker_icons import TrackerIcons
         from deluge.ui.sessionproxy import SessionProxy
@@ -111,23 +110,29 @@ class QtUI(object):
         main_window = MainWindow()
         main_window.show()
 
+        app.aboutToQuit.connect(self.on_quit)
         reactor.callLater(0, connection_manager.first_time)
-        app.exec_()
+        reactor.run() # calls app.exec_()
+
+    def on_quit(self):
+        # Note: Qt docs advise to do cleanup in aboutToQuit(),
+        # because is some cases exec_ is not guaranteed to return.
+        from deluge import component
 
         component.stop()
         component.shutdown()
 
-        ui_config.save()
+        self.ui_config.save()
 
     def on_language_change(self, key, language):
         gettext.bindtextdomain("deluge", self.locale_dir)
         gettext.textdomain("deluge")
         if language:
             t = gettext.translation("deluge", self.locale_dir, languages=[language], class_=QtUITranslations, fallback=True)
-            t.install(unicode=True)
             # QtCore.QLocale.setDefault(QtCore.QLocale(language))
         else:
-            gettext.NullTranslations().install(unicode=True)
+            t = gettext.NullTranslations()
+        t.install(unicode=True)
 
 
 class QtUITranslations(gettext.GNUTranslations):
