@@ -120,7 +120,7 @@ class FileView(QtGui.QTreeView, component.Component):
     def stop(self):
         self.setModel(self.EMPTY_MODEL)
         self.file_models.clear()
-        self.torrent_ids.clear()
+        self.torrent_ids = []
 
     def showEvent(self, event):
         self.update()
