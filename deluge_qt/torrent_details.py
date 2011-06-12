@@ -29,16 +29,18 @@
 #    statement from all source files in the program, then also delete it here.
 #
 
+import logging
 import cPickle as pickle
 
 from PyQt4 import QtGui, QtCore
 from twisted.internet import defer
 
-from deluge.log import LOG as log
 from deluge import component
 
 import formats
 from .generated.ui import Ui_TorrentDetails
+
+log = logging.getLogger(__name__)
 
 
 class TabProxy(QtCore.QObject):

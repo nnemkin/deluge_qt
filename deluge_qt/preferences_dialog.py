@@ -29,12 +29,12 @@
 #    statement from all source files in the program, then also delete it here.
 #
 
+import logging
 import pkg_resources
 
 from PyQt4 import QtGui, QtCore
 from twisted.internet import defer
 
-from deluge.log import LOG as log
 from deluge.ui.client import client
 from deluge import configmanager, component
 
@@ -42,6 +42,7 @@ from .generated.ui import Ui_PreferencesDialog
 from .ui_common import WidgetLoader
 from .ui_tools import IconLoader
 
+log = logging.getLogger(__name__)
 
 PROXY_NONE, PROXY_SOCKS5_AUTH, PROXY_HTTP_AUTH = 0, 3, 5
 

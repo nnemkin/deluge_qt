@@ -1,11 +1,12 @@
 
 import sys
 import functools
+import logging
 
 import sip
 from twisted.internet import defer
 
-from deluge.log import LOG as log
+log = logging.getLogger(__name__)
 
 
 def inlineCallbacks(func):

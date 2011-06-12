@@ -31,14 +31,16 @@
 
 import operator
 import posixpath
+import logging
 
 from PyQt4 import QtCore, QtGui
 
 import deluge.common
 from deluge import component
-from deluge.log import LOG as log
 
 from .ui_tools import IconLoader, natsortkey
+
+log = logging.getLogger(__name__)
 
 
 class Column(object):

@@ -30,6 +30,7 @@
 #
 
 import os
+import logging
 import urlparse
 import HTMLParser
 
@@ -38,8 +39,8 @@ from twisted.internet import reactor, defer
 from twisted.web import client
 
 from deluge import configmanager, component, httpdownloader
-from deluge.log import LOG as log
 
+log = logging.getLogger(__name__)
 
 ICON_EXTENSIONS = frozenset(["gif", "jpg", "jpeg", "png", "ico"])
 

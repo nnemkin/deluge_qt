@@ -31,20 +31,21 @@
 #
 
 import socket
+import logging
 
 from PyQt4 import QtCore, QtGui
 from twisted.python.compat import inet_pton
 from twisted.internet import defer
 
-from deluge.log import LOG as log
-from deluge.ui.countries import COUNTRIES
-
 import deluge.common
+from deluge.ui.countries import COUNTRIES
 from deluge import component
 
 from .lang_tools import memoize
 from .ui_tools import ProgressBarDelegate, HeightFixItemDelegate, IconLoader
 from .ui_common import DictModel, Column
+
+log = logging.getLogger(__name__)
 
 
 class PeerViewModel(DictModel):

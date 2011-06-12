@@ -30,17 +30,19 @@
 #
 
 import uuid
+import logging
 
 from PyQt4 import QtGui, QtCore
 from twisted.internet import defer
 
 from deluge import configmanager, component
 from deluge.ui.client import client, Client
-from deluge.log import LOG as log
 
 from .generated.ui import Ui_ConnectionDialog, Ui_AddHostDialog
 from .ui_tools import HeightFixItemDelegate, IconLoader, WindowStateMixin
 import async_tools
+
+log = logging.getLogger(__name__)
 
 
 class HostItem(QtGui.QTreeWidgetItem):

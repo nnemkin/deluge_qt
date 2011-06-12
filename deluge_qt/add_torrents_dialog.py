@@ -31,12 +31,12 @@
 
 import os
 import base64
+import logging
 
 from PyQt4 import QtGui, QtCore
 from twisted.internet import defer
 
 import deluge.common
-from deluge.log import LOG as log
 from deluge.ui.client import client
 from deluge.ui.common import TorrentInfo
 from deluge.configmanager import ConfigManager
@@ -44,6 +44,8 @@ from deluge.configmanager import ConfigManager
 from .generated.ui import Ui_AddTorrentsDialog, Ui_AddHashDialog, Ui_AddUrlDialog
 from .ui_tools import HeightFixItemDelegate
 from .ui_common import WidgetLoader, FileModel
+
+log = logging.getLogger(__name__)
 
 
 class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):

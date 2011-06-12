@@ -30,13 +30,15 @@
 #
 
 import uuid
+import logging
 
 from PyQt4 import QtGui
 from twisted.internet import defer, reactor
 
 from deluge import configmanager, component
 from deluge.ui.client import client
-from deluge.log import LOG as log
+
+log = logging.getLogger(__name__)
 
 
 class ConnectionManager(component.Component):
