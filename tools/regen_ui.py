@@ -17,7 +17,7 @@ def postprocess(text):
 
         # (Required) Remove fromUtf8 calls. With v2 API they're no-op anyway.
         (r'(?s)try:\s+_fromUtf8.+?\n\n', ''),
-        (r'(?s)_fromUtf8\((?:"((?:[^"]|\\.)*)"\s*)+\)', r'"\1"'),
+        (r'(?s)_fromUtf8\(((?:"(?:[^"]|\\.)*"\s*)+)\)', r'\1'),
 
         # (Required) Replace Qt translation calls with gettext (pyuic4 doesn't have a -tr option).
         (r'(?s)QtGui\.QApplication\.translate\("[^"]+", "(.*?)", None, QtGui\.QApplication\.UnicodeUTF8\)',
