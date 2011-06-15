@@ -32,9 +32,6 @@
    </property>
    <item>
     <widget class="QLabel" name="label">
-     <property name="text">
-      <string/>
-     </property>
      <property name="pixmap">
       <pixmap resource="../data/resources.qrc">:/pixmaps/deluge-about.png</pixmap>
      </property>
@@ -46,15 +43,18 @@
    <item>
     <widget class="QLabel" name="label_about">
      <property name="text">
-      <string notr="true">&lt;h2&gt;Deluge ?&lt;/h2&gt;
+      <string notr="true">&lt;h2&gt;Deluge $version&lt;/h2&gt;
 
 &lt;p&gt;A peer-to-peer file sharing program&lt;br/&gt;utilizing the Bittorrent protocol.&lt;/p&gt;
 
-&lt;p&gt;Core Version: ?&lt;br/&gt;libtorrent Version: ?&lt;br/&gt;Qt Version: ?&lt;br/&gt;PyQt Version: ?&lt;/p&gt;
+&lt;p&gt;Server Version: $server_version&lt;br/&gt;
+libtorrent Version: $lt_version&lt;br/&gt;
+Qt Version: $qt_version&lt;br/&gt;
+PyQt Version: $pyqt_version&lt;/p&gt;
 
-&lt;p&gt;Copyright &amp;copy; 2007-2010 Deluge Team&lt;/p&gt;
+&lt;p&gt;Copyright &amp;copy; 2007-2011 Deluge Team&lt;/p&gt;
 
-&lt;p&gt;&lt;a href=&quot;http://deluge-torrent.org&quot;&gt;http://deluge-torrent.org&lt;/a&gt;&lt;/p&gt;</string>
+&lt;p&gt;&lt;a href=&quot;http://deluge-torrent.org&quot;&gt;www.deluge-torrent.org&lt;/a&gt;&lt;/p&gt;</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignCenter</set>

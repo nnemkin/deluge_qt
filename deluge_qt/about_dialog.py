@@ -29,6 +29,9 @@
 #    statement from all source files in the program, then also delete it here.
 #
 #
+import re
+import string
+
 from PyQt4 import QtGui, QtCore
 from twisted.internet import defer
 
@@ -45,18 +48,30 @@ class AboutDialog(QtGui.QDialog, Ui_AboutDialog):
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
 
-        self.label_about.setText(self.label_about.text().replace('?', deluge.common.get_version(), 1))
+        about_text = self.label_about.text()
+        if client.is_classicmode():
+            # drop the "Server Version" line
+            about_text = re.sub(r"(?m)^.+\$server_version.*$", "", about_text)
+
+        self._template = string.Template(about_text)
+        self._variables = {"version": deluge.common.get_version(),
+                           "server_version": "...",
+                           "lt_version": "...",
+                           "qt_version": QtCore.QT_VERSION_STR,
+                           "pyqt_version": QtCore.PYQT_VERSION_STR}
+
+        self.label_about.setText(self._template.safe_substitute(self._variables))
 
         if client.connected():
             self._get_versions()
 
     @defer.inlineCallbacks
     def _get_versions(self):
-        text = self.label_about.text().replace('?', (yield client.daemon.info()), 1) \
-                                      .replace('?', (yield client.core.get_libtorrent_version()), 1) \
-                                      .replace('?', QtCore.QT_VERSION_STR, 1) \
-                                      .replace('?', QtCore.PYQT_VERSION_STR, 1)
-        self.label_about.setText(text)
+        if not client.is_classicmode():
+            self._variables["server_version"] = yield client.daemon.info()
+        self._variables["lt_version"] = yield client.core.get_libtorrent_version()
+
+        self.label_about.setText(self._template.safe_substitute(self._variables))
 
     @QtCore.pyqtSlot()
     def on_button_credits_clicked(self):
