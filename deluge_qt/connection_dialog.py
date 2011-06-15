@@ -104,7 +104,7 @@ class HostItem(QtGui.QTreeWidgetItem):
 class ConnectionDialog(QtGui.QDialog, Ui_ConnectionDialog, WindowStateMixin):
 
     def __init__(self, parent=None):
-        super(ConnectionDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
+        QtGui.QDialog.__init__(self, parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
 
@@ -242,13 +242,13 @@ class ConnectionDialog(QtGui.QDialog, Ui_ConnectionDialog, WindowStateMixin):
         self.saveWindowState()
         self.host_config["hosts"] = [host.config_tuple() for host in self.hosts()]
 
-        super(ConnectionDialog, self).done(result)
+        QtGui.QDialog.done(self, result)
 
 
 class AddHostDialog(QtGui.QDialog, Ui_AddHostDialog):
 
     def __init__(self, parent):
-        super(AddHostDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
+        QtGui.QDialog.__init__(self, parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
         self.setFixedHeight(self.sizeHint().height())
@@ -266,4 +266,4 @@ class AddHostDialog(QtGui.QDialog, Ui_AddHostDialog):
     @QtCore.pyqtSlot()
     def accept(self):
         self.host = HostItem((None, self.text_host.text(), self.text_port.value(), self.text_username.text(), self.text_password.text()))
-        super(AddHostDialog, self).accept()
+        QtGui.QDialog.accept(self)

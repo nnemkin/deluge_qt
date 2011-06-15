@@ -44,7 +44,7 @@ from .generated.ui import Ui_AboutDialog, Ui_AboutLicenseDialog, Ui_AboutCredits
 class AboutDialog(QtGui.QDialog, Ui_AboutDialog):
 
     def __init__(self, parent):
-        super(AboutDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
+        QtGui.QDialog.__init__(self, parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
 

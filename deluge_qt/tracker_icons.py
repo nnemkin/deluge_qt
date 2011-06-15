@@ -112,7 +112,7 @@ class _FaviconClient(client.HTTPClientFactory):
 class TrackerIcons(component.Component):
 
     def __init__(self):
-        super(TrackerIcons, self).__init__("TrackerIcons")
+        component.Component.__init__(self, "TrackerIcons")
 
         self.image_dir = os.path.join(configmanager.get_config_dir(), "icons")
         if not os.path.exists(self.image_dir):

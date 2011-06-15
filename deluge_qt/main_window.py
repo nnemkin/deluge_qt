@@ -46,7 +46,6 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow, component.Component, WindowSt
 
     def __init__(self):
         QtGui.QMainWindow.__init__(self)
-        Ui_MainWindow.__init__(self)
         component.Component.__init__(self, "MainWindow", interval=3)
 
         self.ui_config = configmanager.ConfigManager("qtui.conf")
@@ -308,7 +307,7 @@ class ConfigActionList(QtGui.QActionGroup):
     """List of actions for upload/download speed and max connections menus."""
 
     def __init__(self, config_key, values, parent=None, suffix="", custom_label=None, custom_max=None):
-        super(ConfigActionList, self).__init__(parent)
+        QtGui.QActionGroup.__init__(self, parent)
 
         self.config_key = config_key
         self.custom_label = custom_label

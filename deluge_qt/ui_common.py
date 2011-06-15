@@ -83,7 +83,7 @@ class BaseModel(QtCore.QAbstractItemModel):
     INVALID_INDEX = QtCore.QModelIndex()
 
     def __init__(self, parent):
-        super(BaseModel, self).__init__(parent)
+        QtCore.QAbstractItemModel.__init__(self, parent)
 
         self.columns = self._create_columns()
         self._clear()
@@ -279,7 +279,7 @@ class FileModel(BaseModel):
                 child.validate()
 
     def __init__(self, parent, path=posixpath):
-        super(FileModel, self).__init__(parent)
+        BaseModel.__init__(self, parent)
         self.path = path
 
     def _create_columns(self):
@@ -348,7 +348,7 @@ class FileModel(BaseModel):
         self.files = files
 
     def flags(self, index):
-        flags = super(FileModel, self).flags(index) | QtCore.Qt.ItemIsDragEnabled
+        flags = BaseModel.flags(self, index) | QtCore.Qt.ItemIsDragEnabled
         if index.column() == 0:
             flags |= QtCore.Qt.ItemIsEditable
         item = index.internalPointer()
@@ -461,7 +461,7 @@ class FileModel(BaseModel):
     class ItemMimeData(QtCore.QMimeData):
 
         def __init__(self, items):
-            super(FileModel.ItemMimeData, self).__init__()
+            QtCore.QMimeData.__init__(self)
             self.items = items
 
     def supportedDropActions(self):

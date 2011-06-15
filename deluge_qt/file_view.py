@@ -66,8 +66,8 @@ class FileViewModel(FileModel):
                     return self.children[0].priority
 
     def __init__(self, files, parent):
-        super(FileViewModel, self).__init__(parent)
-        super(FileViewModel, self).update(files)
+        FileModel.__init__(self, parent)
+        FileModel.update(self, files)
 
         self.priorities = self.progress = [0] * len(files)
         self._expanded = []
@@ -75,7 +75,7 @@ class FileViewModel(FileModel):
     def _create_columns(self):
         fprio = lambda p: _(deluge.common.FILE_PRIORITY[p]) if p is not None else ''
 
-        columns = super(FileViewModel, self)._create_columns()
+        columns = FileModel._create_columns(self)
         columns += [Column("Progress", text=(deluge.common.fpcnt, "progress"), user="progress", width=12),
                     Column("Priority", text=(fprio, "priority"), icon=(self._priority_icons.get, "priority"), width=12)]
         return columns
@@ -124,7 +124,7 @@ class FileView(QtGui.QTreeView, component.Component):
 
     def showEvent(self, event):
         self.update()
-        super(FileView, self).showEvent(event)
+        QtGui.QTreeView.showEvent(self, event)
 
     @defer.inlineCallbacks
     def update(self):

@@ -49,7 +49,7 @@ class StatusBarItem(QtGui.QWidget):
     clicked = QtCore.pyqtSignal()
 
     def __init__(self, parent, icon, minimumWidth=75, context_menu=None, text="", **kwargs):
-        super(StatusBarItem, self).__init__(parent, **kwargs)
+        QtGui.QWidget.__init__(self, parent, **kwargs)
 
         icon = QtGui.QLabel(self, pixmap=icon.pixmap(self._small_icon_size))
         icon.setFixedWidth(self._small_icon_size)
@@ -75,7 +75,7 @@ class StatusBarItem(QtGui.QWidget):
 
     def mousePressEvent(self, event):
         self._pressed = event.button()  in (QtCore.Qt.LeftButton, QtCore.Qt.RightButton)
-        super(StatusBarItem, self).mousePressEvent(event)
+        QtGui.QWidget.mousePressEvent(self, event)
 
     def mouseReleaseEvent(self, event):
         if self._pressed and event.button() in (QtCore.Qt.LeftButton, QtCore.Qt.RightButton):
@@ -85,7 +85,7 @@ class StatusBarItem(QtGui.QWidget):
             self.clicked.emit()
         self._pressed = False
 
-        super(StatusBarItem, self).mouseReleaseEvent(event)
+        QtGui.QWidget.mouseReleaseEvent(self, event)
 
 
 class StatusBar(QtGui.QStatusBar, component.Component):

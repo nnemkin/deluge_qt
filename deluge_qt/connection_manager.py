@@ -47,7 +47,7 @@ class ConnectionManager(component.Component):
     default_host_config = {"hosts": [(uuid.uuid1().hex, "127.0.0.1", 58846, "", "")]}
 
     def __init__(self):
-        super(ConnectionManager, self).__init__("ConnectionManager")
+        component.Component.__init__(self, "ConnectionManager")
 
         self._started_classic = False
         self.ui_config = configmanager.ConfigManager("qtui.conf")

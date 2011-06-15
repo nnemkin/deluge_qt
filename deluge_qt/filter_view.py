@@ -53,7 +53,7 @@ class FilterValueItem(QtGui.QTreeWidgetItem):
     _default_state_icon = IconLoader.customIcon('dht16.png')
 
     def __init__(self, cat, value, count):
-        super(FilterValueItem, self).__init__()
+        QtGui.QTreeWidgetItem.__init__(self)
 
         self.value = value
         self.count = count
@@ -86,7 +86,7 @@ class FilterCategoryItem(QtGui.QTreeWidgetItem):
     _bold_font.setBold(True)
 
     def __init__(self, cat, values):
-        super(FilterCategoryItem, self).__init__()
+        QtGui.QTreeWidgetItem.__init__(self)
         self.cat = cat
         self.items_by_value = {}
         self.setText(0, _(self._cat_names.get(cat, cat)))
@@ -169,7 +169,7 @@ class FilterView(QtGui.QTreeWidget, component.Component):
         if isinstance(self.itemFromIndex(index), FilterCategoryItem):
             # do not update selection when a category is clicked
             return QtGui.QItemSelectionModel.Current | QtGui.QItemSelectionModel.NoUpdate
-        return super(FilterView, self).selectionCommand(index, event)
+        return QtGui.QTreeWidget.selectionCommand(self, index, event)
 
     def on_itemSelectionChanged(self):
         try:

@@ -40,7 +40,7 @@ from .generated.ui import Ui_NewReleaseDialog
 class NewReleaseDialog(QtGui.QDialog, Ui_NewReleaseDialog):
 
     def __init__(self, parent, new_version):
-        super(NewReleaseDialog, self).__init__(parent)
+        QtGui.QDialog.__init__(self, parent)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
 
@@ -55,4 +55,4 @@ class NewReleaseDialog(QtGui.QDialog, Ui_NewReleaseDialog):
         self.ui_config["show_new_releases"] = not self.checkDoNotShow.isChecked()
         if result:
             QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://deluge-torrent.org"))
-        super(NewReleaseDialog, self).done(result)
+        QtGui.QDialog.done(self, result)

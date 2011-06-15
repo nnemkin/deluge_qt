@@ -46,7 +46,7 @@ log = logging.getLogger(__name__)
 class TabProxy(QtCore.QObject):
 
     def __init__(self, parent, i):
-        super(TabProxy, self).__init__(parent)
+        QtCore.QObject.__init__(self, parent)
         self.weight = i
         self.widget = parent.widget(i)
         self.icon = parent.tabIcon(i)

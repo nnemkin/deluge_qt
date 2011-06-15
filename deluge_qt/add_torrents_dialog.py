@@ -60,7 +60,7 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
                                   "add_paused": "add_paused"}
 
     def __init__(self, parent):
-        super(AddTorrentsDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
+        QtGui.QDialog.__init__(self, parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
 
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
@@ -249,7 +249,7 @@ class AddTorrentsDialog(QtGui.QDialog, Ui_AddTorrentsDialog):
                 torrent.options.update(torrent.file_model.file_options())
                 client.core.add_torrent_file(torrent.filename, base64.encodestring(torrent.filedata), torrent.options)
 
-        super(AddTorrentsDialog, self).accept()
+        QtGui.QDialog.accept(self)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -266,7 +266,7 @@ class UserCancelledError(Exception):
 class TorrentItem(QtGui.QListWidgetItem):
 
     def __init__(self, uri):
-        super(TorrentItem, self).__init__(None)
+        QtGui.QListWidgetItem.__init__(self, None)
 
         if deluge.common.is_magnet(uri):
             # TODO: better magnet parsing
@@ -320,8 +320,8 @@ class TorrentFileModel(FileModel):
                     child.setCheckState(state)
 
     def __init__(self, files, parent):
-        super(TorrentFileModel, self).__init__(parent)
-        super(TorrentFileModel, self).update(files)
+        FileModel.__init__(self, parent)
+        FileModel.update(self, files)
 
         self.priorities = [1] * len(files)
 
@@ -330,7 +330,7 @@ class TorrentFileModel(FileModel):
                 "file_priorities": self.priorities}
 
     def _create_columns(self):
-        columns = super(TorrentFileModel, self)._create_columns()
+        columns = FileModel._create_columns(self)
         columns[0].augment(checkState="checkState")
         columns[1].augment(align=(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,))
         return columns
@@ -346,13 +346,13 @@ class TorrentFileModel(FileModel):
         return mapping
 
     def flags(self, index):
-        flags = super(FileModel, self).flags(index)
+        flags = FileModel.flags(self, index)
         if index.column() == 0:
             flags |= QtCore.Qt.ItemIsUserCheckable
         return flags
 
     def setData(self, index, value, role):
-        if super(TorrentFileModel, self).setData(index, value, role):
+        if FileModel.setData(self, index, value, role):
             return True
 
         item = index.internalPointer()

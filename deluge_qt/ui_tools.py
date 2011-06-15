@@ -46,11 +46,13 @@ class TextProgressBar(QtGui.QProgressBar):
     """QProgressBar variant with the ability to set arbitrary label text."""
 
     def __init__(self, parent=None):
-        super(TextProgressBar, self).__init__(parent)
+        QtGui.QProgressBar.__init__(self, parent)
         self._text = None
 
     def text(self):
-        return self._text if self._text is not None else super(TextProgressBar, self).text()
+        if self._text is not None:
+            return self._text
+        return QtGui.QProgressBar.text(self)
 
     def setText(self, value):
         if self._text != value:
@@ -82,7 +84,7 @@ class ProgressBarDelegate(QtGui.QStyledItemDelegate):
 
             QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ProgressBar, self.pb_option, painter)
         else:
-            super(ProgressBarDelegate, self).paint(painter, option, index)
+            QtGui.QStyledItemDelegate.paint(self, painter, option, index)
 
 
 class HeightFixItemDelegate(QtGui.QStyledItemDelegate):
@@ -94,7 +96,7 @@ class HeightFixItemDelegate(QtGui.QStyledItemDelegate):
             widget.setItemDelegate(cls(widget))
 
     def __init__(self, widget):
-        super(HeightFixItemDelegate, self).__init__(widget)
+        QtGui.QStyledItemDelegate.__init__(self, widget)
         self._sizeHint = QtCore.QSize(1, widget.fontMetrics().height() * 1.5)
 
     def sizeHint(self, option, index):
@@ -146,7 +148,7 @@ class _CompatIconLoader(_IconLoader):
         self.theme_paths = []
         self._theme_dirs = []
 
-        super(_CompatIconLoader, self).__init__()
+        _IconLoader.__init__(self)
 
     def themeName(self):
         return self.theme_name
@@ -215,7 +217,7 @@ def context_menu_pos(view, event):
 class HeaderActionList(QtGui.QActionGroup):
 
     def __init__(self, view):
-        super(HeaderActionList, self).__init__(view)
+        QtGui.QActionGroup.__init__(self, view)
         self.setExclusive(False)
 
         model = view.model()
@@ -264,7 +266,7 @@ class WindowStateMixin(object):
 
 def natsortkey(s):
     key = []
-    for part in re.split('(\d+)', s.lower()):
+    for part in re.split(r"(\d+)", s.lower()):
         try:
             part = int(part)
         except:

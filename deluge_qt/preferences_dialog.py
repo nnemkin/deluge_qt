@@ -52,7 +52,7 @@ class PreferencesDialog(QtGui.QDialog, Ui_PreferencesDialog):
     _small_icon_size = QtGui.qApp.style().pixelMetric(QtGui.QStyle.PM_SmallIconSize)
 
     def __init__(self, parent, initial_tab=None):
-        super(PreferencesDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
+        QtGui.QDialog.__init__(self, parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
 
@@ -143,7 +143,7 @@ class PreferencesDialog(QtGui.QDialog, Ui_PreferencesDialog):
 
     def showEvent(self, event):
         self._load_config()
-        super(PreferencesDialog, self).showEvent(event)
+        QtGui.QDialog.showEvent(self, event)
 
     # NB: connected in designer
     @QtCore.pyqtSlot(int)
@@ -256,4 +256,4 @@ class PreferencesDialog(QtGui.QDialog, Ui_PreferencesDialog):
     @QtCore.pyqtSlot()
     def accept(self):
         self._save_config()
-        super(PreferencesDialog, self).accept()
+        QtGui.QDialog.accept(self)

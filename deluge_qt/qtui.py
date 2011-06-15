@@ -162,10 +162,10 @@ class Qt(_UI):
     help = """Starts the Deluge Qt interface"""
 
     def __init__(self):
-        super(Qt, self).__init__("qt")
+        _UI.__init__(self, "qt")
 
     def start(self):
-        super(Qt, self).start()
+        _UI.start(self)
         QtUI(self.args)
 
 

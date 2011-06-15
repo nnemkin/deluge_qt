@@ -63,7 +63,7 @@ class TorrentOptions(QtGui.QWidget, Ui_TorrentOptions, component.Component):
 
     def showEvent(self, event):
         self.update()
-        super(TorrentOptions, self).showEvent(event)
+        QtGui.QWidget.showEvent(self, event)
 
     @defer.inlineCallbacks
     def update(self):
@@ -121,7 +121,7 @@ class EditTrackersDialog(QtGui.QDialog, Ui_EditTackersDialog):
             pass
 
     def __init__(self, parent, trackers=[]):
-        super(EditTrackersDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
+        QtGui.QDialog.__init__(self, parent, QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowSystemMenuHint)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
 
@@ -188,4 +188,4 @@ class EditTrackersDialog(QtGui.QDialog, Ui_EditTackersDialog):
 
     def accept(self):
         self.trackers = [{"tier": int(item.text(0)), "url": item.text(1)} for item in self._tracker_items()]
-        super(EditTrackersDialog, self).accept()
+        QtGui.QDialog.accept(self)

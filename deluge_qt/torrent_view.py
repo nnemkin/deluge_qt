@@ -138,7 +138,7 @@ class TorrentView(QtGui.QTreeView, component.Component):
         self.model().update(status)
 
     def selectionChanged(self, selected, deselected):
-        super(TorrentView, self).selectionChanged(selected, deselected)
+        QtGui.QTreeView.selectionChanged(self, selected, deselected)
         self.selection_changed.emit(self.selected_torrent_ids())
 
     def contextMenuEvent(self, event):
